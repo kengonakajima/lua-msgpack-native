@@ -1,5 +1,5 @@
 local mp = require "./msgpack"
-local mpo = require "./msgpackorig"
+local mpo = require "./orig_mplua/msgpackorig"
 
 local os = require "os"
 local table = require "table"
