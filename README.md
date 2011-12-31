@@ -11,6 +11,19 @@ lua-msgpack-native just directly reads input string and construct Lua table,
 so never make object tree other than Lua tree. 2 or 3 times less buffer copy
 and memory allocation.
 
+Compatibility
+====
+tested on OSX Lion (on luvit).
+
+Usage
+====
+In your app:
+    local mp = require( "msgpack" )
+    local tbl = { a=123, b="any", c={"ta","bl","e",1,2,3} }
+    local packed = mp.pack(tbl)
+    local unpacked_table = mp.unpack(packed)
+
+    
 
 Benchmark
 ====
@@ -31,3 +44,8 @@ Related works
 ====
 In many cases ,Lua runtime doesn't allow adding native modules.
 In these cases you can use [pure lua implementation of MessagePack](https://github.com/kengonakajima/lua-msgpack)
+
+This module mainly targets on [luvit](https://github.com/luvit/luvit).
+To maximize performance, you'd use LuaJIT2 or luvit or something.
+
+
