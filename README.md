@@ -27,3 +27,7 @@ Benchmark
     mp:   str1000    2.22   sec   1351351.3513514   times/sec   3.0855855855856   times faster
     mp:   str10000   1.76   sec   170454.54545455   times/sec   1.4545454545455   times faster
 
+Related works
+====
+In many cases ,Lua runtime doesn't allow adding native modules.
+In these cases you can use [pure lua implementation of MessagePack](https://github.com/kengonakajima/lua-msgpack)
