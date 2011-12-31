@@ -13,7 +13,8 @@ and memory allocation.
 
 Compatibility
 ====
-tested on OSX Lion (on luvit).
+tested on OSX Lion luvit. 
+current luvit depends on LuaJIT2.
 
 Usage
 ====
