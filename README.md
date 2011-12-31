@@ -18,6 +18,7 @@ tested on OSX Lion (on luvit).
 Usage
 ====
 In your app:
+
     local mp = require( "msgpack" )
     local tbl = { a=123, b="any", c={"ta","bl","e",1,2,3} }
     local packed = mp.pack(tbl)
