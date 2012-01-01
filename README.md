@@ -13,11 +13,13 @@ and memory allocation.
 
 Compatibility
 ====
-tested on OSX Lion (on luvit).
+tested on OSX Lion luvit. 
+current luvit depends on LuaJIT2.
 
 Usage
 ====
 In your app:
+
     local mp = require( "msgpack" )
     local tbl = { a=123, b="any", c={"ta","bl","e",1,2,3} }
     local packed = mp.pack(tbl)
@@ -48,4 +50,8 @@ In these cases you can use [pure lua implementation of MessagePack](https://gith
 This module mainly targets on [luvit](https://github.com/luvit/luvit).
 To maximize performance, you'd use LuaJIT2 or luvit or something.
 
+This repository has orig_msgpack directory, 
+that contains original msgpack C++ library source code and mplua stub C code.
+Every line of these code is from those projects.
 
+ 
