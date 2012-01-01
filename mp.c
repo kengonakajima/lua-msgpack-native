@@ -556,8 +556,12 @@ static int msgpack_unpack_api( lua_State *L ) {
         //        fprintf(stderr, "msgpack_unpack_api: unpacked len: %d\n", (int)rb.ofs );
         return 2;
     } else{
-        lua_pushfstring(L,"msgpack_unpack_api: unsupported type or buffer short. error code: %d\n", rb.err );
-        lua_error(L);
+        //        lua_pushfstring(L,"msgpack_unpack_api: unsupported type or buffer short. error code: %d\n", rb.err );
+        //        lua_error(L);
+        lua_pushnil(L);
+        lua_replace(L,-3);
+        lua_pushnil(L);
+        lua_replace(L,-2);        
         return 2;        
     }
 }        
