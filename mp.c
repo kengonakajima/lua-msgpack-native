@@ -563,9 +563,22 @@ static int msgpack_unpack_api( lua_State *L ) {
 }        
 
 
+static int msgpack_largetbl( lua_State *L ) {
+    int n = luaL_checkint(L,1);
+    lua_createtable(L,n,0);
+    int i;
+    for(i=0;i<n;i++){
+        lua_pushnumber(L,i);
+        lua_rawseti(L,-2,i+1);
+    }
+    return 1;
+}
+
+
 static const luaL_reg msgpack_f[] = {
     {"pack", msgpack_pack_api },
     {"unpack", msgpack_unpack_api },
+    {"largetbl", msgpack_largetbl },
     {NULL,NULL}
 };
 
