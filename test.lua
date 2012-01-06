@@ -153,9 +153,9 @@ print(" OK")
 print("corrupt data test")
 local s = mp.pack(data)
 local corrupt_tail = string.sub( s, 1, 10 )
-offset,res = pcall(function() mp.unpack(s) end)
+offset,res = mp.unpack(s) 
 assert(offset)
-offset,res = pcall(function() mp.unpack(corrupt_tail) end)
+offset,res = mp.unpack(corrupt_tail) 
 assert(not offset)
 
 -- Empty data test

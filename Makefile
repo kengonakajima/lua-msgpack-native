@@ -1,14 +1,36 @@
-CFLAGS=$(shell luvit-config --cflags) -arch i386 -g -O3
-LIBS=$(shell luvit-config --libs) -arch i386 ./deps/luvit/deps/luajit/src/libluajit.a 
 
-all: msgpack.luvit
+LUVIT=deps/luvit/build/luvit
+LUVITCONFIG=$(LUVIT) deps/luvit/bin/luvit-config.lua
+
+ifeq ($(shell uname -sm | sed -e s,x86_64,i386,),Darwin i386)
+#osx
+export CC=gcc -arch i386
+CFLAGS=$(shell luvit-config --cflags) -g -O3 -I./deps/luvit/deps/luajit/src
+LIBS=$(shell luvit-config --libs)  ./deps/luvit/deps/luajit/src/libluajit.a
+LDFLAGS=
+else
+# linux
+CFLAGS=$(shell $(LUVITCONFIG) --cflags) -g -O3 -I./deps/luvit/deps/luajit/src
+LIBS=$(shell $(LUVITCONFIG) --libs)  ./deps/luvit/deps/luajit/src/libluajit.a -lm -ldl
+LDFLAGS=
+endif
+
+
+
+
+
+all:  test
 
 
 mp.o: mp.c
-	cc -c mp.c ${CFLAGS}
+	$(CC) -c mp.c $(CFLAGS)
 
-msgpack.luvit: mp.o 
-	g++ -o msgpack.luvit mp.o ${LIBS} 
+msgpack.luvit: mp.o
+	echo $(LIBS)
+	$(CC) -o msgpack.luvit mp.o $(LIBS)
+
+test: $(LUVIT) msgpack.luvit
+	$(LUVIT) test.lua
 
 clean:
 	rm -f *.o *.luvit
