@@ -32,13 +32,12 @@ msgpack.luvit: mp.o
 test: $(LUVIT) msgpack.luvit
 	$(LUVIT) test.lua
 
-$(LUVIT) : deps/luvit
-	cd deps/luvit; ./configure; make
-
-deps/luvit:
+$(LUVIT) :
 	git submodule init
 	git submodule update
+	cd deps/luvit; ./configure; make
+
 
 clean:
-	rm -rf *.o *.luvit deps/luvit
+	rm -rf *.o *.luvit deps/luvit/build/*
 
