@@ -96,6 +96,7 @@ assert(t.d==nil)
 
 
 local data = {
+   nil,
    true,
    false,
    1,
@@ -135,9 +136,9 @@ local data = {
 local offset,res
 
 -- Custom tests
-printf("Custom tests ")
-for i=0,#data do -- 0 tests nil!
-   print("test i:",i, data[i] )
+print("Custom tests")
+for i=1,#data do -- 0 tests nil!
+   printf("%d ", i )
    offset,res = mp.unpack(mp.pack(data[i]))
    assert(offset,"decoding failed")
    if not deepcompare(res,data[i]) then
@@ -183,7 +184,7 @@ for i,v in pairs(files) do
    local offset,i = 0,0
    while true do
       i = i+1
-      print("case:",i)
+      printf("%d ", i)
       if i==#msgpack_cases then break end
       local rlen,res = mp.unpack(string.sub(bindata,offset+1))
       assert(rlen)
@@ -195,6 +196,7 @@ for i,v in pairs(files) do
       end
       offset = offset + rlen
    end
+   print("")
 end
 print("OK")
 
@@ -382,7 +384,7 @@ for n=65530,65550 do
       assert(false,"long str fail. len:"..n)
    end
 end
-
+print("OK")
 
 
 
@@ -393,3 +395,5 @@ end
 --print(" OK")
 
 
+
+print("test finished")
