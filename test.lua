@@ -233,10 +233,13 @@ printf("test raw16:")
 for n=32,32+100 do
    raw_test(rand_raw(n),3)
 end
+print("OK")
+
 for n=65535-5,65535 do
    printf(".")   
    raw_test(rand_raw(n),3)
 end
+print("OK")
 
 -- raw32
 printf("test raw32:")
@@ -244,7 +247,7 @@ for n=65536,65536+5 do
    printf(".")      
    raw_test(rand_raw(n),5)
 end
-
+print("OK")
 
 
 
@@ -356,7 +359,7 @@ end
 print("")
 
 print("long map test")
-for n=65530,65550 do
+for n=65532,65540 do
    printf(".")
    local t = {}
    for i=1,n do
@@ -372,7 +375,7 @@ end
 print("")
 
 print("long str test")
-for n=65530,65550 do
+for n=65532,65540 do
    printf(".")
    local s = ""
    for i=1,n do
@@ -384,7 +387,7 @@ for n=65530,65550 do
       assert(false,"long str fail. len:"..n)
    end
 end
-print("OK")
+print("\nOK")
 
 
 
