@@ -1,8 +1,13 @@
 lua-msgpack-native
 ====
+<a href="http://travis-ci.org/kengonakajima/lua-msgpack-native"><img src="https://secure.travis-ci.org/kengonakajima/lua-msgpack-native.png"></a>
+
 Faster implementation of [MessagePack](http://msgpack.org/) for Lua.
 It's about 5 or 10 times faster than a [Lua binding of libmsgpack mplua](https://github.com/nobu-k/mplua),
-especially on smaller/simpler objects like data packets of multiplayer networked games.
+and 20 or 50 times faster than luvit's embedded JSON parse/stringify.
+
+It's even faster on smaller/simpler objects like data packets of multiplayer networked games.
+
 
 Performance is improved by skipping (1) making msgpack_object tree
 inside libmsgpack, and (2) traversing the tree when constructing Lua table.
