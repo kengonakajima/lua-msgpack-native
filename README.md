@@ -18,7 +18,7 @@ and memory allocation.
 
 Compatibility
 ====
-tested on OSX Lion luvit. 
+tested on luvit on OSX Lion and Linux(Ubuntu 11.04, travis-ci node.js worker)
 current luvit depends on LuaJIT2.
 
 Usage
