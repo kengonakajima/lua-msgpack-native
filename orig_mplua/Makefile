@@ -1,5 +1,5 @@
-CFLAGS=$(shell luvit-config --cflags) -arch i386 -g -O3
-LIBS=$(shell luvit-config --libs) -arch i386 ../deps/luvit/deps/luajit/src/libluajit.a 
+CFLAGS=$(shell luvit-config --cflags) -g -O3
+LIBS=$(shell luvit-config --libs)  ../deps/luvit/deps/luajit/src/libluajit.a 
 
 all: msgpackorig.luvit
 

@@ -29,6 +29,13 @@ In your app:
 
 Benchmark
 ====
+
+command line:
+
+    luvit bench.lua
+
+output:
+
     mp:   empty      0.69   sec   4347826.0869565   times/sec   6.5072463768116   times faster
     mp:   iary1      0.87   sec   3448275.862069    times/sec   5.9310344827586   times faster
     mp:   iary10     0.31   sec   967741.93548387   times/sec   2.9677419354839   times faster
@@ -42,6 +49,29 @@ Benchmark
     mp:   str1000    2.22   sec   1351351.3513514   times/sec   3.0855855855856   times faster
     mp:   str10000   1.76   sec   170454.54545455   times/sec   1.4545454545455   times faster
 
+To compare with luvit's JSON (based on libyajl), command line:
+
+    luvit jsonbench.lua
+
+output:
+
+    json:	empty	0.304742	sec	98443.929619153	times/sec
+    json:	iary1	0.402968	sec	74447.59881678	times/sec
+    json:	iary10	0.060066	sec	49945.060433523	times/sec
+    json:	iary100	0.031954	sec	9388.4959629468	times/sec
+    json:	iary1000	0.302775	sec	990.83477830072	times/sec
+    json:	iary10000	0.331131	sec	90.598584850105	times/sec
+    json:	str1	0.244788	sec	122555.02720722	times/sec
+    json:	str10	0.316844	sec	94683.81916653	times/sec
+    json:	str100	0.420545	sec	71336.00447039	times/sec
+    json:	str500	0.629439	sec	47661.489040241	times/sec
+    json:	str1000	0.630663	sec	47568.986923286	times/sec
+    json:	str10000	0.368189	sec	8147.9892120623	times/sec
+
+lua-msgpack-native is 20x ~ 50x faster than luvit's JSON.
+
+
+    
 Related works
 ====
 In many cases ,Lua runtime doesn't allow adding native modules.

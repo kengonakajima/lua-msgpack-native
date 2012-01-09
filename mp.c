@@ -125,7 +125,7 @@ static size_t mpwbuf_pack_number( mpwbuf_t *b, lua_Number n ) {
                 memcpy(buf+1, &v,2);
                 len=1+2;
             } else if( lv >= -2147483648LL ){
-                long v = htonl(lv&0xffffffff);
+                int v = htonl(lv&0xffffffff);
                 buf[0] = 0xd2;
                 memcpy(buf+1,&v,4);
                 len=1+4;
@@ -452,7 +452,7 @@ static void mprbuf_unpack_anytype( mprbuf_t *b, lua_State *L ) {
         break;
     case 0xd2: // 32bit neg int
         if(mprbuf_left(b)>=4){
-            long v = *(long*)(s);
+            int v = *(long*)(s);
             v = ntohl(v);
             lua_pushnumber(L,v);
             b->ofs += 4;

@@ -144,7 +144,7 @@ for i=1,#data do -- 0 tests nil!
    if not deepcompare(res,data[i]) then
       display("expected",data[i])
       display("found",res)
-      assert(false,string.format("wrong value %d",i))
+      assert(false,string.format("wrong value in case %d",i))
    end
 end
 print(" OK")
