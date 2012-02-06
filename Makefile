@@ -11,7 +11,7 @@ LDFLAGS=
 else
 # linux
 CFLAGS=$(shell $(LUVITCONFIG) --cflags) -g -O3 -I./deps/luvit/deps/luajit/src
-LIBS=$(shell $(LUVITCONFIG) --libs)  ./deps/luvit/deps/luajit/src/libluajit.a -lm -ldl
+LIBS=$(shell $(LUVITCONFIG) --libs)  ./deps/luvit/deps/luajit/src/libluajit.so -lm -ldl
 LDFLAGS=
 endif
 
