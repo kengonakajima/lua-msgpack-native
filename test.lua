@@ -150,6 +150,9 @@ end
 print(" OK")
 
 
+
+
+
 -- Corrupt data test
 print("corrupt data test")
 local s = mp.pack(data)
@@ -158,6 +161,11 @@ offset,res = mp.unpack(s)
 assert(offset)
 offset,res = mp.unpack(corrupt_tail) 
 assert(not offset)
+
+-- error bits test
+local res,msg = pcall( function() mp.pack( { a=function() end } ) end )
+assert( not res )
+assert( msg == "invalid type: function" )
 
 -- Empty data test
 print("empty test")

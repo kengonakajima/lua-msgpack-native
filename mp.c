@@ -23,6 +23,14 @@ typedef struct {
     int err;
 } mpwbuf_t;
 
+#define ERRORBIT_BUFNOLEFT 1
+#define ERRORBIT_STRINGLEN 2
+#define ERRORBIT_TYPE_LIGHTUSERDATA 4
+#define ERRORBIT_TYPE_FUNCTION 8
+#define ERRORBIT_TYPE_USERDATA 16
+#define ERRORBIT_TYPE_THREAD 32
+#define ERRORBIT_TYPE_UNKNOWN 64
+
 typedef struct {
     unsigned char *data; // read buffer dont have to allocate buffer.
     size_t ofs;
@@ -61,7 +69,7 @@ void mp_rcopy( unsigned char *dest, unsigned char*from, size_t l ){
 size_t mpwbuf_append(mpwbuf_t *b, const unsigned char *toadd, size_t l){
     if(b->err){return 0;}
     if( mpwbuf_left(b)<l){
-        b->err |= 1;
+        b->err |= ERRORBIT_BUFNOLEFT;
         return 0;
     }
     memcpy( b->data + b->used, toadd,l);
@@ -164,7 +172,7 @@ static size_t mpwbuf_pack_string( mpwbuf_t *b, const unsigned char *sval, size_t
         wl += mpwbuf_append(b,(unsigned char*)(&l),4);
         wl += mpwbuf_append(b,sval,slen);
     } else {
-        b->err |= 1;
+        b->err |= ERRORBIT_STRINGLEN;
     }
     return wl;    
 }
@@ -280,12 +288,22 @@ static size_t mpwbuf_pack_anytype( mpwbuf_t *b, lua_State *L, int index ) {
     case LUA_TTABLE:
         return mpwbuf_pack_table(&g_mpwbuf, L, index );
     case LUA_TLIGHTUSERDATA:
+        b->err |= ERRORBIT_TYPE_LIGHTUSERDATA;
+        break;
     case LUA_TFUNCTION:
+        b->err |= ERRORBIT_TYPE_FUNCTION;
+        break;
     case LUA_TUSERDATA:
+        b->err |= ERRORBIT_TYPE_USERDATA;
+        break;
     case LUA_TTHREAD:
+        b->err |= ERRORBIT_TYPE_THREAD;
+        break;
+    default:
+        b->err |= ERRORBIT_TYPE_UNKNOWN;
         break;
     }
-    b->err |= 1;
+
     return 0;    
 }
 
@@ -298,7 +316,24 @@ static int msgpack_pack_api( lua_State *L ) {
         lua_pushlstring(L,(const char*)g_mpwbuf.data,g_mpwbuf.used);
         return 1;
     } else {
-        lua_pushfstring( L, "msgpack_pack failed. error code:%d", g_mpwbuf.err );
+        const char *errmsg = "unknown error";
+        if( g_mpwbuf.err & ERRORBIT_BUFNOLEFT ){
+            errmsg = "no buffer left";
+        } else if ( g_mpwbuf.err &  ERRORBIT_STRINGLEN ){
+            errmsg = "string too long";
+        } else if ( g_mpwbuf.err & ERRORBIT_TYPE_LIGHTUSERDATA ){
+            errmsg = "invalid type: lightuserdata";
+        } else if ( g_mpwbuf.err & ERRORBIT_TYPE_FUNCTION ){
+            errmsg = "invalid type: function";
+        } else if ( g_mpwbuf.err & ERRORBIT_TYPE_USERDATA ){
+            errmsg = "invalid type: userdata";
+        } else if ( g_mpwbuf.err & ERRORBIT_TYPE_THREAD ){
+            errmsg = "invalid type: thread";
+        } else if ( g_mpwbuf.err & ERRORBIT_TYPE_UNKNOWN ){
+            errmsg = "invalid type: unknown";
+        }
+
+        lua_pushfstring( L, errmsg );
         lua_error(L);
         return 2;
     }
@@ -549,6 +584,7 @@ static int msgpack_unpack_api( lua_State *L ) {
 
     lua_pushnumber(L,-123456); // push readlen and replace it later
     mprbuf_unpack_anytype(&rb,L);
+
     //    fprintf(stderr, "mprbuf_unpack_anytype: ofs:%d len:%d err:%d\n", (int)rb.ofs, (int)rb.len, rb.err );
     
     if( rb.ofs >0 && rb.err==0){
