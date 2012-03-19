@@ -31,7 +31,6 @@ mp.o: mp.c
 
 msgpack.luvit: mp.o
 	echo $(LIBS)
-	rm $(LUAJITBIN)
 	$(CC) -o msgpack.luvit mp.o $(LIBS)
 
 test: $(LUVIT) msgpack.luvit
@@ -41,6 +40,7 @@ $(LUVIT) :
 	git submodule init
 	git submodule update
 	cd deps/luvit; ./configure; make
+	rm $(LUAJITBIN)
 
 
 clean:
