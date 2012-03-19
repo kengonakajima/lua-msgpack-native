@@ -1,7 +1,5 @@
 
 LUVIT=deps/luvit/build/luvit
-LUVITCONFIG=$(LUVIT) deps/luvit/bin/luvit-config.lua
-
 
 
 ifeq ($(shell uname -sm | sed -e s,x86_64,i386,),Darwin i386)
@@ -13,7 +11,7 @@ LDFLAGS=
 else
 # linux
 CFLAGS=$(shell $(LUVIT) --cflags) -g -O3 -I./deps/luvit/deps/luajit/src
-LIBS=$(shell $(LUVIT) --libs)  ./deps/luvit/deps/luajit/src/libluajit.so -lm -ldl
+LIBS=$(shell $(LUVIT) --libs) -lm -ldl
 LDFLAGS=
 endif
 
