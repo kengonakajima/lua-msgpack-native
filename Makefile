@@ -6,7 +6,7 @@ ifeq ($(shell uname -sm | sed -e s,x86_64,i386,),Darwin i386)
 #osx
 export CC=gcc #-arch i386
 CFLAGS=$(shell $(LUVIT) --cflags) -g -O3 -I./deps/luvit/deps/luajit/src
-LIBS=$(shell $(LUVIT) --libs)  ./deps/luvit/deps/luajit/src/libluajit.a
+LIBS=$(shell $(LUVIT) --libs)
 LDFLAGS=
 else
 # linux
