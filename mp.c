@@ -471,7 +471,7 @@ static void mprbuf_unpack_anytype( mprbuf_t *b, lua_State *L ) {
         break;
     case 0xd0: // 8bit neg int
         if(mprbuf_left(b)>=1){
-            lua_pushnumber(L, (char) s[0] );
+            lua_pushnumber(L, (signed char) s[0] );
             b->ofs += 1;
             return;
         }
