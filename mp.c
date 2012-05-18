@@ -613,6 +613,12 @@ typedef enum {
     MPCT_DOUBLE,
     MPCT_UINT8,
     MPCT_UINT16,
+    MPCT_UINT32,
+    MPCT_UINT64,
+    MPCT_INT8,
+    MPCT_INT16,
+    MPCT_INT32,
+    MPCT_INT64,    
     
 } MP_CONTAINER_TYPE;
 
@@ -630,8 +636,14 @@ char *MP_CONTAINER_TYPE_to_s( MP_CONTAINER_TYPE t ) {
     case MPCT_RAW: return "raw";
     case MPCT_FLOAT: return "float";
     case MPCT_DOUBLE: return "double";
-    case MPCT_UINT8: return "uint8";
-    case MPCT_UINT16: return "uint16";
+    case MPCT_UINT8: return "u8";
+    case MPCT_UINT16: return "u16";
+    case MPCT_UINT32: return "u32";
+    case MPCT_UINT64: return "u64";
+    case MPCT_INT8: return "i8";
+    case MPCT_INT16: return "i16";
+    case MPCT_INT32: return "i32";
+    case MPCT_INT64: return "i64";        
     default:
         assert( !"not impl");
     }
@@ -782,26 +794,31 @@ int unpacker_feed( unpacker_t *u, char *p, size_t len ) {
         } else if( ch==0xcd){ // uint16 (2byte)
             if(unpacker_push( u, MPCT_UINT16, 2 )<0) return -1;
         } else if( ch ==0xce){ // uint32
-            assert(!"not impl");            
+            if(unpacker_push( u, MPCT_UINT32, 4 )<0) return -1;
         } else if( ch ==0xcf){ // uint64
-            assert(!"not impl");            
+            if(unpacker_push( u, MPCT_UINT64, 8 )<0) return -1;
         } else if( ch ==0xd0){ // int8
-            assert(!"not impl");            
+            if(unpacker_push( u, MPCT_INT8, 1 )<0) return -1;
         } else if( ch == 0xd1){ // int16
-            assert(!"not impl");            
+            if(unpacker_push( u, MPCT_INT16, 2 )<0) return -1;
         } else if( ch == 0xd2){ // int32
-            assert(!"not impl");
+            if(unpacker_push( u, MPCT_INT32, 4 )<0) return -1;            
         } else if( ch == 0xd3){ // int64
-            assert(!"not impl");
+            if(unpacker_push( u, MPCT_INT64, 8 )<0) return -1;            
         } else if( ch == 0xda){ // raw 16
             assert(!"not impl");
         } else if( ch == 0xdb){ // raw 32
+            assert(!"not impl");            
         } else if( ch == 0xdc){ // array 16
+            assert(!"not impl");            
         } else if( ch == 0xdd){ // array 32
+            assert(!"not impl");            
         } else if( ch == 0xde){ // map16
+            assert(!"not impl");            
         } else if( ch == 0xdf){ // map32
+            assert(!"not impl");            
         } else if( ch >= 0xe0 ) { // neg fixnum
-            if( u->nstacked==0) u->resultnum ++;
+            unpacker_progress(u);
         }
             
     }
@@ -815,7 +832,7 @@ void unpacker_shift( unpacker_t *u, size_t l ) {
 
 static int msgpack_unpacker_feed_api( lua_State *L ) {
     unpacker_t *u =  luaL_checkudata( L, 1, "msgpack_unpacker" );
-    fprintf(stderr, "feed. used:%d\n",(int)u->used );
+    //    fprintf(stderr, "feed. used:%d\n",(int)u->used );
     size_t slen;
     const char *sval = luaL_checklstring(L, 2, &slen );
     int res = unpacker_feed( u, (char*)sval, slen );

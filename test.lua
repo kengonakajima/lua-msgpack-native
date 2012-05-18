@@ -84,9 +84,7 @@ function streamtest(unp,t)
   local startat = 1
   while true do
     local unit = 1+math.floor( math.random(0, #s/10 ) )
---    if unit > #s - 
     local subs = string.sub( s, startat, startat+unit-1 )
---    print("OOOOOO:",startat,unit, #subs)
     if subs and #subs > 0 then
       unp:feed( subs )
       startat = startat + unit
@@ -103,10 +101,45 @@ function streamtest(unp,t)
 end
 
 -- streaming: types
-streamtest( unp, { 1000 })
-streamtest( unp, { 10000 })
+t = {}
+for i=1,100 do table.insert(t,i) end
+--streamtest( unp, t ) -- table
 
-streamtest( unp, { 1,10,100 })
+streamtest( unp, {0.001}) -- double
+streamtest( unp, {-10000000000000000}) -- i64
+streamtest( unp, {-1000000000000000}) -- i64
+streamtest( unp, {-100000000000000}) -- i64
+streamtest( unp, {-10000000000000}) -- i64
+streamtest( unp, {-1000000000000}) -- i64
+streamtest( unp, {-100000000000}) -- i64
+streamtest( unp, {-10000000000}) -- i64
+streamtest( unp, {-1000000000}) -- i32
+streamtest( unp, {-100000000}) -- i32
+streamtest( unp, {-10000000}) -- i32
+streamtest( unp, {-1000000}) -- i32
+streamtest( unp, {-100000}) -- i32
+streamtest( unp, {-10000}) -- i16
+streamtest( unp, {-1000}) -- i16
+streamtest( unp, {-100}) -- i8
+streamtest( unp, {-10}) -- neg fixnum
+streamtest( unp, {-1}) -- neg fixnum
+streamtest( unp, { 1000000000000000000 }) -- u64
+streamtest( unp, { 100000000000000000 }) -- u64
+streamtest( unp, { 10000000000000000 }) -- u64
+streamtest( unp, { 1000000000000000 }) -- u64
+streamtest( unp, { 100000000000000 }) -- u64
+streamtest( unp, { 10000000000000 }) -- u64
+streamtest( unp, { 1000000000000 }) -- u64
+streamtest( unp, { 100000000000 }) -- u64
+streamtest( unp, { 10000000000 }) -- u64
+streamtest( unp, { 1000000000 }) -- u32
+streamtest( unp, { 100000000 }) -- u32
+streamtest( unp, { 10000000 }) -- u32
+streamtest( unp, { 1000000 }) -- u32
+streamtest( unp, { 100000 }) -- u32
+streamtest( unp, { 10000 }) -- u16
+streamtest( unp, { 1000 }) -- u16
+streamtest( unp, { 1,10,100 }) -- u8
 
 --,10000,1000000,1000000000,-1,-10,-100,-1000,-10000,-1000000,-10000000000 }
     
