@@ -14,7 +14,14 @@
 #define ntohll(x) ( ( (uint64_t)(ntohl( (uint32_t)((x << 32) >> 32) )) << 32) | ntohl( ((uint32_t)(x >> 32)) ) )
 
 #define htonll(x) ntohll(x)
-    
+
+#define MP_ENABLE_DEBUGPRINT 0
+
+#if MP_ENABLE_DEBUGPRINT
+#define MPDEBUGPRINT(...) fprintf( stderr, __VA_ARGS__ )
+#else
+#define MPDEBUGPRINT(...) 
+#endif
 
 typedef struct {
     unsigned char data[1024*1024];
@@ -716,14 +723,20 @@ void mpstackent_init( mpstackent_t *e, MP_CONTAINER_TYPE t, size_t expect ) {
 }
 
 
+int unpacker_progress( unpacker_t *u, char ch ) ;
+
 // error:-1
 // give expect=0 when need size bytes.
 int unpacker_push( unpacker_t *u, MP_CONTAINER_TYPE t, int expect ) {
-    fprintf(stderr, "push: t:%s expect:%d\n", MP_CONTAINER_TYPE_to_s(t), expect );
+    MPDEBUGPRINT( "push: t:%s expect:%d\n", MP_CONTAINER_TYPE_to_s(t), expect );
     if( u->nstacked >= elementof(u->stack)) return -1;
     mpstackent_t *ent = & u->stack[ u->nstacked ];
     mpstackent_init( ent, t, expect );
     u->nstacked ++;
+    // handle empty container
+    if( MP_CONTAINER_TYPE_sizesize(t)==0 && expect == 0 ){
+        unpacker_progress(u, 0x0);
+    }
     return 0;
 }
 mpstackent_t *unpacker_top( unpacker_t *u ) {
@@ -758,18 +771,18 @@ int unpacker_progress( unpacker_t *u, char ch ) {
     for(i = u->nstacked-1; i >= 0; i-- ) {
         mpstackent_t *e = & u->stack[ i ];
         if( e->sizesofar < e->sizesize ) {
-            fprintf(stderr, "(%s Size:%d/%d)", MP_CONTAINER_TYPE_to_s(e->t), (int)e->sizesofar, (int)e->sizesize );
+            MPDEBUGPRINT( "(%s Size:%d/%d)", MP_CONTAINER_TYPE_to_s(e->t), (int)e->sizesofar, (int)e->sizesize );
             e->sizebytes[ e->sizesofar ] = ch;
             e->sizesofar ++;
             if(e->sizesofar == e->sizesize){
                 if( e->sizesize == 2 ){
                     e->expect = ntohs( *(short*)( e->sizebytes ) );
                     if( MP_CONTAINER_TYPE_is_map(e->t) ) e->expect *= 2;
-                    fprintf(stderr, "expect:%d ", (int)e->expect );
+                    MPDEBUGPRINT( "expect:%d ", (int)e->expect );
                 } else if(e->sizesize == 4 ){
                     e->expect = ntohl( *(int*)( e->sizebytes ) );
                     if( MP_CONTAINER_TYPE_is_map(e->t) ) e->expect *= 2;                    
-                    fprintf(stderr, "expect:%d ", (int)e->expect );                    
+                    MPDEBUGPRINT( "expect:%d ", (int)e->expect );                    
                 } else {
                     assert(!"possible bug in msgpack, not parse error" );
                 }
@@ -777,17 +790,17 @@ int unpacker_progress( unpacker_t *u, char ch ) {
             break;
         } 
         e->sofar++;
-        fprintf(stderr, "(%s %d/%d)", MP_CONTAINER_TYPE_to_s(e->t),(int)e->sofar,(int)e->expect) ;
+        MPDEBUGPRINT( "(%s %d/%d)", MP_CONTAINER_TYPE_to_s(e->t),(int)e->sofar,(int)e->expect) ;
         if(e->sofar < e->expect){
             break;
         }
         u->nstacked --;
         assert(u->nstacked >= 0);
-        fprintf(stderr, "fill-pop! " );
+        MPDEBUGPRINT( "fill-pop! " );
     }
-    fprintf(stderr,"\n");
+    MPDEBUGPRINT( "\n");
     if( u->nstacked == 0 ) {
-        fprintf(stderr, "got result!\n" );
+        MPDEBUGPRINT( "got result!\n" );
         u->resultnum ++;
         return 1;
     }
@@ -819,9 +832,9 @@ int unpacker_feed( unpacker_t *u, char *p, size_t len ) {
     for(i=0;i<len;i++){
         unsigned char ch = (unsigned char)( p[i] );
         int k;
-        for(k=0;k<u->nstacked;k++)fprintf(stderr," ");
+        for(k=0;k<u->nstacked;k++){ MPDEBUGPRINT(" "); }
         
-        fprintf(stderr, "[%x]:", ch );
+        MPDEBUGPRINT( "[%x]:", ch );
 
         if( unpacker_container_needs_bytes(u) ){
             unpacker_progress(u,ch);
@@ -840,11 +853,15 @@ int unpacker_feed( unpacker_t *u, char *p, size_t len ) {
             int n = ch & 0x1f;
             if(unpacker_push( u, MPCT_RAW, n )<0) return -1;
         } else if( ch==0xc0){ // nil
-            if( u->nstacked==0) u->resultnum++;
+            unpacker_progress(u,ch);            
+        } else if( ch==0xc1){ // reserved
+            return -1;
         } else if( ch==0xc2){ // false
-            if( u->nstacked==0) u->resultnum++;
+            unpacker_progress(u,ch);            
         } else if( ch==0xc3){ // true
-            if( u->nstacked==0) u->resultnum++;
+            unpacker_progress(u,ch);            
+        } else if( ch>=0xc4 && ch<=0xc9){ // reserved
+            return -1;
         } else if( ch==0xca){ // float (4byte)
             if(unpacker_push( u, MPCT_FLOAT, 4 )<0) return -1;
         } else if( ch==0xcb){ // double (8byte)
@@ -864,7 +881,9 @@ int unpacker_feed( unpacker_t *u, char *p, size_t len ) {
         } else if( ch == 0xd2){ // int32
             if(unpacker_push( u, MPCT_INT32, 4 )<0) return -1;            
         } else if( ch == 0xd3){ // int64
-            if(unpacker_push( u, MPCT_INT64, 8 )<0) return -1;            
+            if(unpacker_push( u, MPCT_INT64, 8 )<0) return -1;
+        } else if( ch >= 0xd4 && ch <= 0xd9 ) { // reserved
+            return -1;
         } else if( ch == 0xda){ // raw 16
             if(unpacker_push( u, MPCT_RAW16, 0 )<0) return -1;            
         } else if( ch == 0xdb){ // raw 32
@@ -901,7 +920,7 @@ static int msgpack_unpacker_feed_api( lua_State *L ) {
 }
 static int msgpack_unpacker_pull_api( lua_State *L ) {
     unpacker_t *u =  luaL_checkudata( L, 1, "msgpack_unpacker" );
-    fprintf(stderr, "pull:%d\n", (int)u->resultnum );
+    MPDEBUGPRINT( "pull:%d\n", (int)u->resultnum );
     if( u->resultnum == 0 ) {
         lua_pushnil(L);
     } else {
@@ -914,7 +933,6 @@ static int msgpack_unpacker_pull_api( lua_State *L ) {
     return 1;
 }
 static int msgpack_unpacker_gc_api( lua_State *L ) {
-    fprintf(stderr, "gc\n");
     unpacker_t *u =  luaL_checkudata( L, 1, "msgpack_unpacker" );
     free(u->buf);
     u->buf = NULL;
@@ -943,15 +961,6 @@ static int msgpack_createUnpacker_api( lua_State *L ) {
     unpacker_t *u = (unpacker_t*) lua_newuserdata( L, sizeof(unpacker_t));
 
     unpacker_init( u, bufsz );
-#if 0        
-    unpacker_feed( u, data, 4 );
-    unpacker_feed( u, data+4, 9 );
-    unpacker_feed( u, data+4+9, 13 );
-    assert( u->resultnum == 0 );
-    unpacker_feed( u, data+4+9+13, 2 );
-    unpacker_dump(u);
-    assert( u->resultnum == 1 );    
-#endif
     luaL_getmetatable(L, "msgpack_unpacker" );
     lua_setmetatable(L, -2 );
     return 1;

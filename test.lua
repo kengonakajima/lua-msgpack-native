@@ -73,14 +73,32 @@ assert(t[1][4]=="work")
 assert(t[1][5][1]==nil)
 assert(t[2]=="too")
 
-
 -- streaming API test 
 unp = mp.createUnpacker(1024*1024)
 
-function streamtest(unp,t)
+
+
+--streaming: basic test
+print("stream basic test")
+t = { aho=7, hoge = { 5,6,"7", {8,9,10} }, fuga="11" }
+sss = mp.pack(t)
+assert(unp)
+unp:feed( string.char( 0x83, 0xa3, 0x61, 0x68 ) )
+unp:feed( string.char( 0x6f, 0x7, 0xa4, 0x66 ) )
+unp:feed( string.char( 0x75, 0x67, 0x61, 0xa2 ) )
+unp:feed( string.char( 0x31, 0x31, 0xa4, 0x68 ) )
+unp:feed( string.char( 0x6f, 0x67, 0x65, 0x94 ) )
+unp:feed( string.char( 0x5, 0x6, 0xa1, 0x37 ) )
+unp:feed( string.char( 0x93, 0x8, 0x9, 0xa ) )
+out = unp:pull() 
+assert( out )
+assert( deepcompare(t,out) )
+assert( not unp:pull() )
+
+
+function streamtest(unp,t,dolog)
   local s = mp.pack(t)
-  print("streamtest:  len:", #s )
-  if #s < 1000 then simpledump(s) end
+  if dolog and #s < 1000 then simpledump(s) end
   local startat = 1
   while true do
     local unit = 1+math.floor( math.random(0, #s/10 ) )
@@ -93,15 +111,24 @@ function streamtest(unp,t)
     end
   end
   local out = unp:pull()
-  assert(out, "no result")
+  if t ~= nil and t ~= false then 
+    assert(out, "no result")
+  end
   local res = deepcompare(out,t)
   assert(res,"table differ")
   out = unp:pull()
   assert(not out,"have to be nil")
 end
 
--- streaming: types
+   
+--streaming: empty table
+print("stream empty containers" )
+streamtest(unp,{})
+streamtest(unp,"")
 
+
+-- streaming: types
+print("stream types test")
 t = {}
 for i=1,70000 do table.insert( t, "a" ) end -- raw32
 streamtest( unp, { table.concat( t ) } )
@@ -162,10 +189,9 @@ streamtest( unp, { 10000 }) -- u16
 streamtest( unp, { 1000 }) -- u16
 streamtest( unp, { 1,10,100 }) -- u8
 
---,10000,1000000,1000000000,-1,-10,-100,-1000,-10000,-1000000,-10000000000 }
-    
 
 -- streaming: multiple tables
+print("stream multiple tables")
 t1 = {10,20,30}
 s1 = mp.pack(t1)
 t2 = {"aaa","bbb","ccc"}
@@ -191,31 +217,44 @@ out4 = unp:pull()
 assert( not out4 )
 
 
---streaming: basic test
+
+
+-- stream: gc test
+print("stream gc test")
 t = { aho=7, hoge = { 5,6,"7", {8,9,10} }, fuga="11" }
-sss = mp.pack(t)
-simpledump(sss)
-assert(unp)
-unp:feed( string.char( 0x83, 0xa3, 0x61, 0x68 ) )
-unp:feed( string.char( 0x6f, 0x7, 0xa4, 0x66 ) )
-unp:feed( string.char( 0x75, 0x67, 0x61, 0xa2 ) )
-unp:feed( string.char( 0x31, 0x31, 0xa4, 0x68 ) )
-unp:feed( string.char( 0x6f, 0x67, 0x65, 0x94 ) )
-unp:feed( string.char( 0x5, 0x6, 0xa1, 0x37 ) )
-unp:feed( string.char( 0x93, 0x8, 0x9, 0xa ) )
-out = unp:pull() 
-assert( out )
-assert( deepcompare(t,out) )
-assert( not unp:pull() )
-
-
-
+s = mp.pack(t)
+for i=1,100000 do
+  local u = mp.createUnpacker(1024)
+  u:feed( string.sub(s,1,11))
+  u:feed( string.sub(s,12,#s))
+  local out = u:pull()
+  assert(out)
+  out = u:pull()
+  assert(not out)
+end
 
 -- stream: find corrupt data
-    
----------
+print("stream corrupt input")
+s = string.char( 0x91, 0xc1 ) -- c1: reserved code
+local uc = mp.createUnpacker(1024)
+local res = uc:feed(s)
+assert( res == -1 )
+
+-- stream: too deep
+print("stream too deep")
+t={}
+for i=1,2000 do
+  table.insert(t, 0x91 )
+end
+s = string.char( unpack(t) )
+uc = mp.createUnpacker(1024*1024)
+res = uc:feed(s)
+assert(res==-1)
 
 
+
+-- normal test  
+print("simple table")
 
 sss = mp.pack({1,2,3})
 l,t = mp.unpack(sss)
@@ -244,26 +283,26 @@ local data = {
    -5,
    -31,
    -32,   
-   -128,
-   -32768,
+   -128, -- 10
+   -32768, 
    
    -2147483648,
    -2147483648*100,   
    127,
-   255,
+   255, --15
    65535,
    4294967295,
    4294967295*100,   
    42,
-   -42,
-   --  0.79, double is not implemented!
+   -42, -- 20
+   0.79, 
    "Hello world!",
-   {},
+   {}, 
    {1,2,3},
-   {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18},
+   {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18}, -- 25
    {a=1,b=2},
    {a=1,b=2,c=3,d=4,e=5,f=6,g=7,h=8,i=9,j=10,k=11,l=12,m=13,n=14,o=15,p=16,q=17,r=18},
-   {true,false,42,-42,0.79,"Hello","World!"},
+   {true,false,42,-42,0.79,"Hello","World!"}, -- 28
    {{"multi","level",{"lists","used",45,{{"trees"}}},"work",{}},"too"},
    {foo="bar",spam="eggs"},
    {nested={maps={"work","too"}}},
@@ -284,9 +323,14 @@ for i=1,#data do -- 0 tests nil!
       display("expected",data[i])
       display("found",res)
       assert(false,string.format("wrong value in case %d",i))
-   end
+    end
 end
 print(" OK")
+-- on streaming
+for i=1,#data do
+  printf("%d ",i)
+  streamtest(unp, data[i])
+end
 
 
 
@@ -337,10 +381,13 @@ for i,v in pairs(files) do
       assert(rlen)
 
       if not deepcompare(res,msgpack_cases[i]) then
-         display("expected",msgpack_cases[i])
-         display("found",res)
-         assert(false,string.format("wrong value %d",i))
+        display("expected",msgpack_cases[i])
+        display("found",res)
+        assert(false,string.format("wrong value %d",i))
       end
+      -- stream too.
+      streamtest(unp,msgpack_cases[i])
+       
       offset = offset + rlen
    end
    print("")
