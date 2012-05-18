@@ -610,8 +610,8 @@ typedef enum {
     // containers with size bytes
     MPCT_ARRAY16,
     MPCT_MAP16,
-    MPCT_MAP32,
     MPCT_ARRAY32,
+    MPCT_MAP32,
     // direct values with size bytes
     MPCT_RAW16,
     MPCT_RAW32,    
@@ -633,7 +633,7 @@ typedef enum {
 } MP_CONTAINER_TYPE;
 
 int MP_CONTAINER_TYPE_is_container( MP_CONTAINER_TYPE t ) {
-    if(t==MPCT_FIXARRAY || t==MPCT_FIXMAP ){
+    if( t >= MPCT_FIXARRAY && t <= MPCT_MAP32 ) {
         return 1;
     } else {
         return 0;
@@ -653,7 +653,13 @@ char *MP_CONTAINER_TYPE_to_s( MP_CONTAINER_TYPE t ) {
     case MPCT_INT8: return "i8";
     case MPCT_INT16: return "i16";
     case MPCT_INT32: return "i32";
-    case MPCT_INT64: return "i64";        
+    case MPCT_INT64: return "i64";
+    case MPCT_ARRAY16: return "ary16";
+    case MPCT_MAP16: return "map16";
+    case MPCT_RAW16: return "raw16";
+    case MPCT_ARRAY32: return "ary32";
+    case MPCT_MAP32: return "map32";
+    case MPCT_RAW32: return "raw32";        
     default:
         assert( !"not impl");
     }
@@ -667,13 +673,18 @@ int MP_CONTAINER_TYPE_sizesize( MP_CONTAINER_TYPE t) {
         return 0;
     }
 }
+int MP_CONTAINER_TYPE_is_map( MP_CONTAINER_TYPE t) {
+    if( t == MPCT_FIXMAP || t == MPCT_MAP16 || t == MPCT_MAP32 ) return 1; else return 0;
+}
 
 typedef struct {
     MP_CONTAINER_TYPE t;
     size_t expect;
     size_t sofar;
 
-    size_t sizesize; // array16,map16,raw16:2 array32,map32,raw32:4
+    // for containers with size bytes
+    char sizebytes[4];
+    size_t sizesize; // array16,map16,raw16:2 array32,map32,raw32:4    
     size_t sizesofar;
 } mpstackent_t;
 
@@ -706,6 +717,7 @@ void mpstackent_init( mpstackent_t *e, MP_CONTAINER_TYPE t, size_t expect ) {
 
 
 // error:-1
+// give expect=0 when need size bytes.
 int unpacker_push( unpacker_t *u, MP_CONTAINER_TYPE t, int expect ) {
     fprintf(stderr, "push: t:%s expect:%d\n", MP_CONTAINER_TYPE_to_s(t), expect );
     if( u->nstacked >= elementof(u->stack)) return -1;
@@ -726,6 +738,10 @@ mpstackent_t *unpacker_top( unpacker_t *u ) {
 int unpacker_container_needs_bytes( unpacker_t *u ) {
     mpstackent_t *top = unpacker_top(u);
     if(!top)return 0;
+    if( top->sizesofar < top->sizesize ) {
+        return 1;
+    }
+    
     if( top->sofar < top->expect ) {
         if( MP_CONTAINER_TYPE_is_container(top->t) ){
             return 0;
@@ -737,10 +753,29 @@ int unpacker_container_needs_bytes( unpacker_t *u ) {
 }
 
 // move 1 byte forward
-int unpacker_progress( unpacker_t *u ) {
+int unpacker_progress( unpacker_t *u, char ch ) {
     int i;
     for(i = u->nstacked-1; i >= 0; i-- ) {
         mpstackent_t *e = & u->stack[ i ];
+        if( e->sizesofar < e->sizesize ) {
+            fprintf(stderr, "(%s Size:%d/%d)", MP_CONTAINER_TYPE_to_s(e->t), (int)e->sizesofar, (int)e->sizesize );
+            e->sizebytes[ e->sizesofar ] = ch;
+            e->sizesofar ++;
+            if(e->sizesofar == e->sizesize){
+                if( e->sizesize == 2 ){
+                    e->expect = ntohs( *(short*)( e->sizebytes ) );
+                    if( MP_CONTAINER_TYPE_is_map(e->t) ) e->expect *= 2;
+                    fprintf(stderr, "expect:%d ", (int)e->expect );
+                } else if(e->sizesize == 4 ){
+                    e->expect = ntohl( *(int*)( e->sizebytes ) );
+                    if( MP_CONTAINER_TYPE_is_map(e->t) ) e->expect *= 2;                    
+                    fprintf(stderr, "expect:%d ", (int)e->expect );                    
+                } else {
+                    assert(!"possible bug in msgpack, not parse error" );
+                }
+            }
+            break;
+        } 
         e->sofar++;
         fprintf(stderr, "(%s %d/%d)", MP_CONTAINER_TYPE_to_s(e->t),(int)e->sofar,(int)e->expect) ;
         if(e->sofar < e->expect){
@@ -785,15 +820,16 @@ int unpacker_feed( unpacker_t *u, char *p, size_t len ) {
         unsigned char ch = (unsigned char)( p[i] );
         int k;
         for(k=0;k<u->nstacked;k++)fprintf(stderr," ");
+        
         fprintf(stderr, "[%x]:", ch );
 
         if( unpacker_container_needs_bytes(u) ){
-            unpacker_progress(u);
+            unpacker_progress(u,ch);
             continue;
         }
             
         if( ch <= 0x7f ){ // posfixnum
-            unpacker_progress(u);
+            unpacker_progress(u,ch);
         } else if( ch>=0x80 && ch<=0x8f ){ // fixmap
             int n = ch & 0xf;
             if(unpacker_push( u, MPCT_FIXMAP, n*2 )<0) return -1;
@@ -830,19 +866,19 @@ int unpacker_feed( unpacker_t *u, char *p, size_t len ) {
         } else if( ch == 0xd3){ // int64
             if(unpacker_push( u, MPCT_INT64, 8 )<0) return -1;            
         } else if( ch == 0xda){ // raw 16
-            assert(!"not impl");
+            if(unpacker_push( u, MPCT_RAW16, 0 )<0) return -1;            
         } else if( ch == 0xdb){ // raw 32
-            assert(!"not impl");            
+            if(unpacker_push( u, MPCT_RAW32, 0 )<0) return -1;            
         } else if( ch == 0xdc){ // array 16
-            assert(!"not impl");            
+            if(unpacker_push( u, MPCT_ARRAY16, 0)<0) return -1;
         } else if( ch == 0xdd){ // array 32
-            assert(!"not impl");            
+            if(unpacker_push( u, MPCT_ARRAY32, 0)<0) return -1;
         } else if( ch == 0xde){ // map16
-            assert(!"not impl");            
+            if(unpacker_push( u, MPCT_MAP16, 0)<0) return -1;
         } else if( ch == 0xdf){ // map32
-            assert(!"not impl");            
+            if(unpacker_push( u, MPCT_MAP32, 0)<0) return -1;
         } else if( ch >= 0xe0 ) { // neg fixnum
-            unpacker_progress(u);
+            unpacker_progress(u,ch);
         }
             
     }

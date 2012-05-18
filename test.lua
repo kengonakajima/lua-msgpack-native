@@ -80,7 +80,7 @@ unp = mp.createUnpacker(1024*1024)
 function streamtest(unp,t)
   local s = mp.pack(t)
   print("streamtest:  len:", #s )
-  simpledump(s)
+  if #s < 1000 then simpledump(s) end
   local startat = 1
   while true do
     local unit = 1+math.floor( math.random(0, #s/10 ) )
@@ -101,9 +101,30 @@ function streamtest(unp,t)
 end
 
 -- streaming: types
+
 t = {}
-for i=1,100 do table.insert(t,i) end
---streamtest( unp, t ) -- table
+for i=1,70000 do table.insert( t, "a" ) end -- raw32
+streamtest( unp, { table.concat( t ) } )
+
+t = {}
+for i=1,100 do table.insert( t, "a" ) end -- raw16
+streamtest( unp, { table.concat( t ) } )
+
+t = {}
+for i=1,70000 do t[ "key" .. i ] = i end -- map32
+streamtest( unp, t )
+
+t = {}
+for i=1,100 do t[ "key" .. i ] = i end -- map16
+streamtest( unp, t ) 
+
+t = {}
+for i=1,70000 do table.insert(t,1) end -- ary32
+streamtest( unp, t ) 
+
+t = {}
+for i=1,100 do table.insert(t,i) end -- ary16
+streamtest( unp, t ) 
 
 streamtest( unp, {0.001}) -- double
 streamtest( unp, {-10000000000000000}) -- i64
