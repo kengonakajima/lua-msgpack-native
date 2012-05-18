@@ -5,7 +5,7 @@ local os = require "os"
 local table = require "table"
 
 
-
+local unp = mp.createUnpacker(1024*1024)
 
 local nLoop = 3000
 
@@ -37,23 +37,39 @@ local datasets = {
 }
 
 for i,v in ipairs(datasets) do
-   st = os.clock()
-   local nLoop = v[2]
-   local offset,res
-   for j=1, nLoop do
-      offset,res = mp.unpack( mp.pack(v[3] ) )
-   end
-   assert(offset)      
-   local et = os.clock()
-   local mptime = et - st
-   st = os.clock()
-   for j=1, nLoop do
-      offset,res = mpo.unpack( mpo.pack( v[3] ) )
-   end
-   assert(offset)      
-   et = os.clock()
-   local mpotime = et - st
 
-   print( "mp:", v[1], mptime, "sec", nLoop/mptime, "times/sec", (mpotime/mptime), "times faster")
+  -- lua-msgpack-native  
+  st = os.clock()
+  local nLoop = v[2]
+  local offset,res
+  for j=1, nLoop do
+    offset,res = mp.unpack( mp.pack(v[3] ) )
+  end
+  assert(offset)
+  local et = os.clock()
+  local mptime = et - st
+
+  -- lua-msgpack-native streaming api (one bulk feed)
+  st = os.clock()
+  for j=1, nLoop do
+    unp:feed( mp.pack(v[3]) )
+    unp:pull()    
+  end
+  et = os.clock()
+  local mpstime = et - st
+  
+  -- original pure lua msgpack
+  st = os.clock()
+  for j=1, nLoop do
+    offset,res = mpo.unpack( mpo.pack( v[3] ) )
+  end
+  assert(offset)      
+  et = os.clock()
+  local mpotime = et - st
+
+
+  
+
+  print( "mp:", v[1], mptime, "sec", "native:", nLoop/mptime, "stream:", nLoop/mpstime, "orig:", nLoop/mpotime, "(times/sec)", (mpotime/mptime), "times faster")
 
 end
