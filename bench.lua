@@ -1,5 +1,5 @@
 local mp = require "./msgpack"
-local mpo = require "./orig_mplua/msgpackorig"
+--local mpo = require "./orig_mplua/msgpackorig"
 
 local os = require "os"
 local table = require "table"
@@ -59,17 +59,18 @@ for i,v in ipairs(datasets) do
   local mpstime = et - st
   
   -- original pure lua msgpack
-  st = os.clock()
-  for j=1, nLoop do
-    offset,res = mpo.unpack( mpo.pack( v[3] ) )
-  end
-  assert(offset)      
-  et = os.clock()
-  local mpotime = et - st
+--  st = os.clock()
+--  for j=1, nLoop do
+--    offset,res = mpo.unpack( mpo.pack( v[3] ) )
+--  end
+--  assert(offset)      
+--  et = os.clock()
+--  local mpotime = et - st
 
 
   
 
-  print( "mp:", v[1], mptime, "sec", "native:", nLoop/mptime, "stream:", nLoop/mpstime, "orig:", nLoop/mpotime, "(times/sec)", (mpotime/mptime), "times faster")
+--  print( "mp:", v[1], mptime, "sec", "native:", nLoop/mptime, "stream:", nLoop/mpstime, "orig:", nLoop/mpotime, "(times/sec)", (mpotime/mptime), "times faster")
+  print( "mp:", v[1], mptime, "sec", "native:", nLoop/mptime, "stream:", nLoop/mpstime )
 
 end
