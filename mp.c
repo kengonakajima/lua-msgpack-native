@@ -646,11 +646,12 @@ inline int MP_CONTAINER_TYPE_is_container( MP_CONTAINER_TYPE t ) {
         return 0;
     }
 }
+
 inline char *MP_CONTAINER_TYPE_to_s( MP_CONTAINER_TYPE t ) {
     switch(t){
     case MPCT_FIXARRAY: return "fixary";
     case MPCT_FIXMAP: return "fixmap";
-    case MPCT_RAW: return "raw";
+    case MPCT_RAW: return "fixraw";
     case MPCT_FLOAT: return "float";
     case MPCT_DOUBLE: return "double";
     case MPCT_UINT8: return "u8";
@@ -750,6 +751,7 @@ inline int unpacker_progress( unpacker_t *u, char ch ) {
         } 
         e->sofar++;
         MPDEBUGPRINT( "(%s %d/%d)", MP_CONTAINER_TYPE_to_s(e->t),(int)e->sofar,(int)e->expect) ;
+        //        assert( e->sofar <= e->expect );
         if(e->sofar < e->expect){
             break;
         }
@@ -765,8 +767,6 @@ inline int unpacker_progress( unpacker_t *u, char ch ) {
     }
     return 0;
 }
-
-
 inline mpstackent_t *unpacker_top( unpacker_t *u ) {
     if( u->nstacked == 0 ) {
         return NULL;
@@ -774,6 +774,21 @@ inline mpstackent_t *unpacker_top( unpacker_t *u ) {
         return & u->stack[ u->nstacked - 1 ];
     }
 }
+
+
+inline void unpacker_progress_datasize( unpacker_t *u, size_t progress) {
+    MPDEBUGPRINT( ">%d>",(int)progress);
+    mpstackent_t *top = unpacker_top(u);
+    size_t need = top->expect - top->sofar;
+    assert( progress <= need );
+    top->sofar += progress; 
+    if( top->sofar == top->expect ){
+        top->sofar -= 1; // sofar++ is in unpacker_progress!
+        MPDEBUGPRINT("[DS]");
+        unpacker_progress(u,0);
+    }
+}
+
 
 // error:-1
 // give expect=0 when need size bytes.
@@ -785,6 +800,7 @@ inline int unpacker_push( unpacker_t *u, MP_CONTAINER_TYPE t, int expect ) {
     u->nstacked ++;
     // handle empty container
     if( MP_CONTAINER_TYPE_sizesize(t)==0 && expect == 0 ){
+        MPDEBUGPRINT("[PUSH]");        
         unpacker_progress(u, 0x0);
     }
     return 0;
@@ -792,10 +808,11 @@ inline int unpacker_push( unpacker_t *u, MP_CONTAINER_TYPE t, int expect ) {
 
 
 // need bytes, not values
-inline int unpacker_container_needs_bytes( unpacker_t *u ) {
+inline int unpacker_container_needs_bytes( unpacker_t *u, size_t *dataneed ) {
     mpstackent_t *top = unpacker_top(u);
     if(!top)return 0;
     if( top->sizesofar < top->sizesize ) {
+        *dataneed = 0;
         return 1;
     }
     
@@ -803,6 +820,7 @@ inline int unpacker_container_needs_bytes( unpacker_t *u ) {
         if( MP_CONTAINER_TYPE_is_container(top->t) ){
             return 0;
         } else {
+            *dataneed = top->expect - top->sofar;
             return 1;
         }
     }
@@ -830,17 +848,33 @@ int unpacker_feed( unpacker_t *u, char *p, size_t len ) {
     }
     memcpy( u->buf + u->used, p, len );
     u->used += len;
+
+
     
     size_t i;
     for(i=0;i<len;i++){
         unsigned char ch = (unsigned char)( p[i] );
+
+#if MP_ENABLE_DEBUGPRINT
         int k;
         for(k=0;k<u->nstacked;k++){ MPDEBUGPRINT(" "); }
-        
+#endif        
         MPDEBUGPRINT( "[%x]:", ch );
 
-        if( unpacker_container_needs_bytes(u) ){
-            unpacker_progress(u,ch);
+        size_t dataneed; // for data, not for sizebytes.
+        if( unpacker_container_needs_bytes(u, &dataneed ) ){
+            if(dataneed>0){
+                size_t progress = len-i;
+                if( progress > dataneed ) {
+                    progress = dataneed;
+                }
+                MPDEBUGPRINT( "dneed:%d progress:%d len:%d ", (int) dataneed,(int)progress, (int)len );
+                i += progress -1; // sofar++ in unpacker_progress!
+                unpacker_progress_datasize( u, progress );
+            } else {
+                MPDEBUGPRINT("[FEED]");
+                unpacker_progress(u,ch);
+            }
             continue;
         }
             
@@ -914,9 +948,9 @@ void unpacker_shift( unpacker_t *u, size_t l ) {
 
 static int msgpack_unpacker_feed_api( lua_State *L ) {
     unpacker_t *u =  luaL_checkudata( L, 1, "msgpack_unpacker" );
-    //    fprintf(stderr, "feed. used:%d\n",(int)u->used );
     size_t slen;
     const char *sval = luaL_checklstring(L, 2, &slen );
+    MPDEBUGPRINT( "feed. used:%d len:%d\n",(int)u->used, (int)slen );
     int res = unpacker_feed( u, (char*)sval, slen );
     lua_pushnumber(L,res);
     return 1;

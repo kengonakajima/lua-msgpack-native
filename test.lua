@@ -49,53 +49,6 @@ function deepcompare(t1,t2,ignore_mt,eps)
     return true
 end
 
-
-local msgpack_cases = {
-   false,true,nil,0,0,0,0,0,0,0,0,0,-1,-1,-1,-1,-1,127,127,255,65535,
-   4294967295,-32,-32,-128,-32768,-2147483648, 0.0,-0.0,1.0,-1.0,  
-   "a","a","a","","","",
-   {0},{0},{0},{},{},{},{},{},{},{a=97},{a=97},{a=97},{{}},{{"a"}},
-}
-
-
--- quick test   
-local origt = {{"multi","level",{"lists","used",45,{{"trees"}}},"work",{}},"too"}
-local sss = mp.pack(origt)
-local l,t = mp.unpack(sss)
-assert(#t == #origt)
-assert(t[1][1]=="multi")
-assert(t[1][2]=="level")
-assert(t[1][3][1]=="lists")
-assert(t[1][3][2]=="used")
-assert(t[1][3][3]==45)
-assert(t[1][3][4][1][1]=="trees")
-assert(t[1][4]=="work")
-assert(t[1][5][1]==nil)
-assert(t[2]=="too")
-
--- streaming API test 
-unp = mp.createUnpacker(1024*1024)
-
-
-
---streaming: basic test
-print("stream basic test")
-t = { aho=7, hoge = { 5,6,"7", {8,9,10} }, fuga="11" }
-sss = mp.pack(t)
-assert(unp)
-unp:feed( string.char( 0x83, 0xa3, 0x61, 0x68 ) )
-unp:feed( string.char( 0x6f, 0x7, 0xa4, 0x66 ) )
-unp:feed( string.char( 0x75, 0x67, 0x61, 0xa2 ) )
-unp:feed( string.char( 0x31, 0x31, 0xa4, 0x68 ) )
-unp:feed( string.char( 0x6f, 0x67, 0x65, 0x94 ) )
-unp:feed( string.char( 0x5, 0x6, 0xa1, 0x37 ) )
-unp:feed( string.char( 0x93, 0x8, 0x9, 0xa ) )
-out = unp:pull() 
-assert( out )
-assert( deepcompare(t,out) )
-assert( not unp:pull() )
-
-
 function streamtest(unp,t,dolog)
   local s = mp.pack(t)
   if dolog and #s < 1000 then simpledump(s) end
@@ -119,6 +72,61 @@ function streamtest(unp,t,dolog)
   out = unp:pull()
   assert(not out,"have to be nil")
 end
+
+
+local msgpack_cases = {
+   false,true,nil,0,0,0,0,0,0,0,0,0,-1,-1,-1,-1,-1,127,127,255,65535,
+   4294967295,-32,-32,-128,-32768,-2147483648, 0.0,-0.0,1.0,-1.0,  
+   "a","a","a","","","",
+   {0},{0},{0},{},{},{},{},{},{},{a=97},{a=97},{a=97},{{}},{{"a"}},
+}
+
+
+
+
+-- quick test   
+local origt = {{"multi","level",{"lists","used",45,{{"trees"}}},"work",{}},"too"}
+local sss = mp.pack(origt)
+local l,t = mp.unpack(sss)
+assert(#t == #origt)
+assert(t[1][1]=="multi")
+assert(t[1][2]=="level")
+assert(t[1][3][1]=="lists")
+assert(t[1][3][2]=="used")
+assert(t[1][3][3]==45)
+assert(t[1][3][4][1][1]=="trees")
+assert(t[1][4]=="work")
+assert(t[1][5][1]==nil)
+assert(t[2]=="too")
+
+-- streaming API test 
+unp = mp.createUnpacker(1024*1024)
+
+-- stream raw test
+streamtest(unp,{ hoge = { 5,6 }, fug="11" },true)
+streamtest(unp,"a")
+streamtest(unp,"aaaaaaaaaaaaaaaaa")
+
+
+
+--streaming: basic test
+print("stream basic test")
+t = { aho=7, hoge = { 5,6,"7", {8,9,10} }, fuga="11" }
+sss = mp.pack(t)
+assert(unp)
+unp:feed( string.char( 0x83, 0xa3, 0x61, 0x68 ) )
+unp:feed( string.char( 0x6f, 0x7, 0xa4, 0x66 ) )
+unp:feed( string.char( 0x75, 0x67, 0x61, 0xa2 ) )
+unp:feed( string.char( 0x31, 0x31, 0xa4, 0x68 ) )
+unp:feed( string.char( 0x6f, 0x67, 0x65, 0x94 ) )
+unp:feed( string.char( 0x5, 0x6, 0xa1, 0x37 ) )
+unp:feed( string.char( 0x93, 0x8, 0x9, 0xa ) )
+out = unp:pull() 
+assert( out )
+assert( deepcompare(t,out) )
+assert( not unp:pull() )
+
+
 
    
 --streaming: empty table

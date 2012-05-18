@@ -76,6 +76,33 @@ output:
 lua-msgpack-native is 20x ~ 50x faster than luvit's JSON.
 
 
+Streaming API
+====
+It also has streaming parser: feed() bytes, and pull() tables.
+
+    local tbl = { aho=7, hoge = { 5,6,"7", {8,9,10} }, fuga="11" }
+    local str = mp.pack(tbl)
+    local u = mp.createUnpacker(1024)
+    u:feed( string.sub(s,1,11))  -- feed first half of the data
+    u:feed( string.sub(s,12,#s))  -- and feed latter half of the data
+    local outtbl = u:pull()  -- pull() success
+    local outnil = u:pull()  -- pull() returns nil, no data.
+
+Streaming API is 10~30% slower than normal unpack() function:
+    
+    mp:	empty	0.627703	sec	native:	4779330.3520933	stream:	3023163.4785728
+    mp:	iary1	0.768256	sec	native:	3904948.3505498	stream:	2733462.7779818
+    mp:	iary10	0.205636	sec	native:	1458888.5214651	stream:	979799.79424204
+    mp:	iary100	0.16467	sec	native:	182182.54691201	stream:	147220.47738694
+    mp:	iary1000	1.922974	sec	native:	15600.834956687	stream:	12727.952322788
+    mp:	iary10000	1.795387	sec	native:	1670.9489374714	stream:	1251.2110680463
+    mp:	str1	0.384245	sec	native:	7807518.6404508	stream:	3619223.8695053
+    mp:	str10	0.410769	sec	native:	7303374.8895365	stream:	3783345.4610574
+    mp:	str100	0.647663	sec	native:	4632038.5756172	stream:	2638573.4816329
+    mp:	str500	1.378287	sec	native:	2176614.8849986	stream:	1583412.5919303
+    mp:	str1000	2.246217	sec	native:	1335578.8866347	stream:	1072244.242942
+    mp:	str10000	1.777126	sec	native:	168811.89065941	stream:	155099.03590439
+
     
 Related works
 ====
