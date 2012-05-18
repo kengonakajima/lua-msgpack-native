@@ -10,7 +10,7 @@ LIBS=$(shell $(LUVIT) --libs)
 LDFLAGS=
 else
 # linux
-CFLAGS=$(shell $(LUVIT) --cflags) -g -O3 -I./deps/luvit/deps/luajit/src
+CFLAGS=$(shell $(LUVIT) --cflags) -g -O3 -I./deps/luvit/deps/luajit/src -fno-strict-aliasing
 LIBS=$(shell $(LUVIT) --libs) -lm -ldl
 LDFLAGS=
 endif
