@@ -639,14 +639,14 @@ typedef enum {
     
 } MP_CONTAINER_TYPE;
 
-int MP_CONTAINER_TYPE_is_container( MP_CONTAINER_TYPE t ) {
+inline int MP_CONTAINER_TYPE_is_container( MP_CONTAINER_TYPE t ) {
     if( t >= MPCT_FIXARRAY && t <= MPCT_MAP32 ) {
         return 1;
     } else {
         return 0;
     }
 }
-char *MP_CONTAINER_TYPE_to_s( MP_CONTAINER_TYPE t ) {
+inline char *MP_CONTAINER_TYPE_to_s( MP_CONTAINER_TYPE t ) {
     switch(t){
     case MPCT_FIXARRAY: return "fixary";
     case MPCT_FIXMAP: return "fixmap";
@@ -671,7 +671,7 @@ char *MP_CONTAINER_TYPE_to_s( MP_CONTAINER_TYPE t ) {
         assert( !"not impl");
     }
 }
-int MP_CONTAINER_TYPE_sizesize( MP_CONTAINER_TYPE t) {
+inline int MP_CONTAINER_TYPE_sizesize( MP_CONTAINER_TYPE t) {
     if( t == MPCT_ARRAY16 || t == MPCT_MAP16 || t == MPCT_RAW16 ){
         return 2;
     } else if( t == MPCT_ARRAY32 || t == MPCT_MAP32 || t == MPCT_RAW32 ){
@@ -680,7 +680,7 @@ int MP_CONTAINER_TYPE_sizesize( MP_CONTAINER_TYPE t) {
         return 0;
     }
 }
-int MP_CONTAINER_TYPE_is_map( MP_CONTAINER_TYPE t) {
+inline int MP_CONTAINER_TYPE_is_map( MP_CONTAINER_TYPE t) {
     if( t == MPCT_FIXMAP || t == MPCT_MAP16 || t == MPCT_MAP32 ) return 1; else return 0;
 }
 
@@ -714,7 +714,7 @@ void unpacker_init( unpacker_t *u, size_t maxsize ) {
     u->size = maxsize;
 }
 #define elementof(x) ( sizeof(x) / sizeof(x[0]))
-void mpstackent_init( mpstackent_t *e, MP_CONTAINER_TYPE t, size_t expect ) {
+inline void mpstackent_init( mpstackent_t *e, MP_CONTAINER_TYPE t, size_t expect ) {
     e->t = t;
     e->expect = expect;
     e->sofar = 0;
@@ -723,50 +723,9 @@ void mpstackent_init( mpstackent_t *e, MP_CONTAINER_TYPE t, size_t expect ) {
 }
 
 
-int unpacker_progress( unpacker_t *u, char ch ) ;
-
-// error:-1
-// give expect=0 when need size bytes.
-int unpacker_push( unpacker_t *u, MP_CONTAINER_TYPE t, int expect ) {
-    MPDEBUGPRINT( "push: t:%s expect:%d\n", MP_CONTAINER_TYPE_to_s(t), expect );
-    if( u->nstacked >= elementof(u->stack)) return -1;
-    mpstackent_t *ent = & u->stack[ u->nstacked ];
-    mpstackent_init( ent, t, expect );
-    u->nstacked ++;
-    // handle empty container
-    if( MP_CONTAINER_TYPE_sizesize(t)==0 && expect == 0 ){
-        unpacker_progress(u, 0x0);
-    }
-    return 0;
-}
-mpstackent_t *unpacker_top( unpacker_t *u ) {
-    if( u->nstacked == 0 ) {
-        return NULL;
-    } else {
-        return & u->stack[ u->nstacked - 1 ];
-    }
-}
-
-// need bytes, not values
-int unpacker_container_needs_bytes( unpacker_t *u ) {
-    mpstackent_t *top = unpacker_top(u);
-    if(!top)return 0;
-    if( top->sizesofar < top->sizesize ) {
-        return 1;
-    }
-    
-    if( top->sofar < top->expect ) {
-        if( MP_CONTAINER_TYPE_is_container(top->t) ){
-            return 0;
-        } else {
-            return 1;
-        }
-    }
-    return 0;
-}
 
 // move 1 byte forward
-int unpacker_progress( unpacker_t *u, char ch ) {
+inline int unpacker_progress( unpacker_t *u, char ch ) {
     int i;
     for(i = u->nstacked-1; i >= 0; i-- ) {
         mpstackent_t *e = & u->stack[ i ];
@@ -806,6 +765,50 @@ int unpacker_progress( unpacker_t *u, char ch ) {
     }
     return 0;
 }
+
+
+inline mpstackent_t *unpacker_top( unpacker_t *u ) {
+    if( u->nstacked == 0 ) {
+        return NULL;
+    } else {
+        return & u->stack[ u->nstacked - 1 ];
+    }
+}
+
+// error:-1
+// give expect=0 when need size bytes.
+inline int unpacker_push( unpacker_t *u, MP_CONTAINER_TYPE t, int expect ) {
+    MPDEBUGPRINT( "push: t:%s expect:%d\n", MP_CONTAINER_TYPE_to_s(t), expect );
+    if( u->nstacked >= elementof(u->stack)) return -1;
+    mpstackent_t *ent = & u->stack[ u->nstacked ];
+    mpstackent_init( ent, t, expect );
+    u->nstacked ++;
+    // handle empty container
+    if( MP_CONTAINER_TYPE_sizesize(t)==0 && expect == 0 ){
+        unpacker_progress(u, 0x0);
+    }
+    return 0;
+}
+
+
+// need bytes, not values
+inline int unpacker_container_needs_bytes( unpacker_t *u ) {
+    mpstackent_t *top = unpacker_top(u);
+    if(!top)return 0;
+    if( top->sizesofar < top->sizesize ) {
+        return 1;
+    }
+    
+    if( top->sofar < top->expect ) {
+        if( MP_CONTAINER_TYPE_is_container(top->t) ){
+            return 0;
+        } else {
+            return 1;
+        }
+    }
+    return 0;
+}
+
 
 
 
