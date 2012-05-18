@@ -603,6 +603,283 @@ static int msgpack_unpack_api( lua_State *L ) {
     }
 }        
 
+typedef enum {
+    // containers
+    MPCT_ARRAY,
+    MPCT_MAP,
+    // direct values
+    MPCT_RAW,
+    MPCT_FLOAT,
+    MPCT_DOUBLE,
+    MPCT_UINT8,
+    MPCT_UINT16,
+    
+} MP_CONTAINER_TYPE;
+
+int MP_CONTAINER_TYPE_is_container( MP_CONTAINER_TYPE t ) {
+    if(t==MPCT_ARRAY || t==MPCT_MAP ){
+        return 1;
+    } else {
+        return 0;
+    }
+}
+char *MP_CONTAINER_TYPE_to_s( MP_CONTAINER_TYPE t ) {
+    switch(t){
+    case MPCT_ARRAY: return "ary";
+    case MPCT_MAP: return "map";
+    case MPCT_RAW: return "raw";
+    case MPCT_FLOAT: return "float";
+    case MPCT_DOUBLE: return "double";
+    case MPCT_UINT8: return "uint8";
+    case MPCT_UINT16: return "uint16";
+    default:
+        assert( !"not impl");
+    }
+}
+
+typedef struct {
+    MP_CONTAINER_TYPE t;
+    size_t expect;
+    size_t sofar;
+} mpstackent_t;
+
+typedef struct {
+    char *buf;
+    size_t size;
+    size_t used;
+    
+    mpstackent_t stack[256];
+    size_t nstacked;
+    size_t resultnum;
+} unpacker_t;
+
+void unpacker_init( unpacker_t *u, size_t maxsize ) {
+    u->nstacked = 0;
+    u->resultnum = 0;
+    u->buf = (char*) malloc( maxsize );
+    assert(u->buf);
+    u->used = 0;
+    u->size = maxsize;
+}
+#define elementof(x) ( sizeof(x) / sizeof(x[0]))
+void mpstackent_init( mpstackent_t *e, MP_CONTAINER_TYPE t, size_t expect ) {
+    e->t = t;
+    e->expect = expect;
+    e->sofar = 0;
+}
+
+
+// error:-1
+int unpacker_push( unpacker_t *u, MP_CONTAINER_TYPE t, int expect ) {
+    fprintf(stderr, "push: t:%s expect:%d\n", MP_CONTAINER_TYPE_to_s(t), expect );
+    if( u->nstacked >= elementof(u->stack)) return -1;
+    mpstackent_t *ent = & u->stack[ u->nstacked ];
+    mpstackent_init( ent, t, expect );
+    u->nstacked ++;
+    return 0;
+}
+mpstackent_t *unpacker_top( unpacker_t *u ) {
+    if( u->nstacked == 0 ) {
+        return NULL;
+    } else {
+        return & u->stack[ u->nstacked - 1 ];
+    }
+}
+
+// need bytes, not values
+int unpacker_container_needs_bytes( unpacker_t *u ) {
+    mpstackent_t *top = unpacker_top(u);
+    if(!top)return 0;
+    if( top->sofar < top->expect ) {
+        if( MP_CONTAINER_TYPE_is_container(top->t) ){
+            return 0;
+        } else {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+// move 1 byte forward
+int unpacker_progress( unpacker_t *u ) {
+    int i;
+    for(i = u->nstacked-1; i >= 0; i-- ) {
+        mpstackent_t *e = & u->stack[ i ];
+        e->sofar++;
+        fprintf(stderr, "(%s %d/%d)", MP_CONTAINER_TYPE_to_s(e->t),(int)e->sofar,(int)e->expect) ;
+        if(e->sofar < e->expect){
+            break;
+        }
+        u->nstacked --;
+        assert(u->nstacked >= 0);
+        fprintf(stderr, "fill-pop! " );
+    }
+    fprintf(stderr,"\n");
+    if( u->nstacked == 0 ) {
+        fprintf(stderr, "got result!\n" );
+        u->resultnum ++;
+        return 1;
+    }
+    return 0;
+}
+
+
+
+void unpacker_dump( unpacker_t *u ) {
+    fprintf(stderr, "\n------\nnstacked:%d resultnum:%d\n", (int) u->nstacked, (int) u->resultnum );
+    int i;
+    for(i=0;i<u->nstacked;i++){
+        fprintf(stderr, "  stack[%d]: %s %d/%d\n", i, MP_CONTAINER_TYPE_to_s(u->stack[i].t), (int)u->stack[i].sofar, (int)u->stack[i].expect );
+    }
+    fprintf(stderr, "--------\n");
+}
+                   
+
+                  
+int unpacker_feed( unpacker_t *u, char *p, size_t len ) {
+
+    if(u->used + len > u->size ){
+        return -1;
+    }
+    memcpy( u->buf + u->used, p, len );
+    u->used += len;
+    
+    size_t i;
+    for(i=0;i<len;i++){
+        unsigned char ch = (unsigned char)( p[i] );
+        int k;
+        for(k=0;k<u->nstacked;k++)fprintf(stderr," ");
+        fprintf(stderr, "[%x]:", ch );
+
+        if( unpacker_container_needs_bytes(u) ){
+            unpacker_progress(u);
+            continue;
+        }
+            
+        if( ch <= 0x7f ){ // posfixnum
+            unpacker_progress(u);
+        } else if( ch>=0x80 && ch<=0x8f ){ // fixmap
+            int n = ch & 0xf;
+            if(unpacker_push( u, MPCT_MAP, n*2 )<0) return -1;
+        } else if( ch>=0x90 && ch<=0x9f ){ // fixarray
+            int n = ch & 0xf;
+            if(unpacker_push( u, MPCT_ARRAY, n )<0) return -1;
+        } else if( ch>=0xa0 && ch<=0xbf ){ // fixraw
+            int n = ch & 0x1f;
+            if(unpacker_push( u, MPCT_RAW, n )<0) return -1;
+        } else if( ch==0xc0){ // nil
+            if( u->nstacked==0) u->resultnum++;
+        } else if( ch==0xc2){ // false
+            if( u->nstacked==0) u->resultnum++;
+        } else if( ch==0xc3){ // true
+            if( u->nstacked==0) u->resultnum++;
+        } else if( ch==0xca){ // float (4byte)
+            if(unpacker_push( u, MPCT_FLOAT, 4 )<0) return -1;
+        } else if( ch==0xcb){ // double (8byte)
+            if(unpacker_push( u, MPCT_DOUBLE, 8 )<0) return -1;
+        } else if( ch==0xcc){ // uint8 (1byte)
+            if(unpacker_push( u, MPCT_UINT8, 1 )<0) return -1;
+        } else if( ch==0xcd){ // uint16 (2byte)
+            if(unpacker_push( u, MPCT_UINT16, 2 )<0) return -1;
+        } else if( ch ==0xce){ // uint32
+            assert(!"not impl");            
+        } else if( ch ==0xcf){ // uint64
+            assert(!"not impl");            
+        } else if( ch ==0xd0){ // int8
+            assert(!"not impl");            
+        } else if( ch == 0xd1){ // int16
+            assert(!"not impl");            
+        } else if( ch == 0xd2){ // int32
+            assert(!"not impl");
+        } else if( ch == 0xd3){ // int64
+            assert(!"not impl");
+        } else if( ch == 0xda){ // raw 16
+            assert(!"not impl");
+        } else if( ch == 0xdb){ // raw 32
+        } else if( ch == 0xdc){ // array 16
+        } else if( ch == 0xdd){ // array 32
+        } else if( ch == 0xde){ // map16
+        } else if( ch == 0xdf){ // map32
+        } else if( ch >= 0xe0 ) { // neg fixnum
+            if( u->nstacked==0) u->resultnum ++;
+        }
+            
+    }
+    return 0;                
+}
+void unpacker_shift( unpacker_t *u, size_t l ) {
+    assert( l <= u->used );
+    memmove( u->buf, u->buf + l, u->used - l );
+    u->used -= l;
+}
+
+static int msgpack_unpacker_feed_api( lua_State *L ) {
+    unpacker_t *u =  luaL_checkudata( L, 1, "msgpack_unpacker" );
+    fprintf(stderr, "feed. used:%d\n",(int)u->used );
+    size_t slen;
+    const char *sval = luaL_checklstring(L, 2, &slen );
+    int res = unpacker_feed( u, (char*)sval, slen );
+    lua_pushnumber(L,res);
+    return 1;
+}
+static int msgpack_unpacker_pull_api( lua_State *L ) {
+    unpacker_t *u =  luaL_checkudata( L, 1, "msgpack_unpacker" );
+    fprintf(stderr, "pull:%d\n", (int)u->resultnum );
+    if( u->resultnum == 0 ) {
+        lua_pushnil(L);
+    } else {
+        mprbuf_t rb;
+        mprbuf_init( &rb, (const unsigned char*) u->buf, u->used );
+        mprbuf_unpack_anytype(&rb,L);
+        unpacker_shift( u, rb.ofs );
+        u->resultnum --;
+    }
+    return 1;
+}
+static int msgpack_unpacker_gc_api( lua_State *L ) {
+    fprintf(stderr, "gc\n");
+    unpacker_t *u =  luaL_checkudata( L, 1, "msgpack_unpacker" );
+    free(u->buf);
+    u->buf = NULL;
+    return 0;
+}
+
+static const luaL_reg msgpack_unpacker_m[] = {
+    {"feed", msgpack_unpacker_feed_api },
+    {"pull", msgpack_unpacker_pull_api },
+    {"__gc", msgpack_unpacker_gc_api },
+    {NULL,NULL}
+};
+    
+static int msgpack_createUnpacker_api( lua_State *L ) {
+    size_t bufsz = luaL_checknumber(L,1);
+#if 0    
+    //    { aho=7, hoge = { 5,6,"7", {8,9,10} }, fuga="11" }
+    char data[28] = { 0x83, 0xa3, 0x61, 0x68,
+                      0x6f, 0x7, 0xa4, 0x66,
+                      0x75, 0x67, 0x61, 0xa2,
+                      0x31, 0x31, 0xa4, 0x68,
+                      0x6f, 0x67, 0x65, 0x94,
+                      0x5, 0x6, 0xa1, 0x37,
+                      0x93, 0x8, 0x9, 0xa };
+#endif    
+    unpacker_t *u = (unpacker_t*) lua_newuserdata( L, sizeof(unpacker_t));
+
+    unpacker_init( u, bufsz );
+#if 0        
+    unpacker_feed( u, data, 4 );
+    unpacker_feed( u, data+4, 9 );
+    unpacker_feed( u, data+4+9, 13 );
+    assert( u->resultnum == 0 );
+    unpacker_feed( u, data+4+9+13, 2 );
+    unpacker_dump(u);
+    assert( u->resultnum == 1 );    
+#endif
+    luaL_getmetatable(L, "msgpack_unpacker" );
+    lua_setmetatable(L, -2 );
+    return 1;
+}
+
 
 static int msgpack_largetbl( lua_State *L ) {
     int n = luaL_checkint(L,1);
@@ -619,12 +896,25 @@ static int msgpack_largetbl( lua_State *L ) {
 static const luaL_reg msgpack_f[] = {
     {"pack", msgpack_pack_api },
     {"unpack", msgpack_unpack_api },
+    {"createUnpacker", msgpack_createUnpacker_api },
     {"largetbl", msgpack_largetbl },
+    { "feed", msgpack_unpacker_feed_api },
+    { "pull", msgpack_unpacker_pull_api },        
     {NULL,NULL}
 };
 
-LUALIB_API int luaopen_msgpack ( lua_State *L ) {    
+
+LUALIB_API int luaopen_msgpack ( lua_State *L ) {
+
+    luaL_newmetatable(L, "msgpack_unpacker" );
+    lua_pushvalue(L,-1);
+    lua_setfield(L,-2,"__index");
+    luaL_register(L,NULL, msgpack_unpacker_m );
+        
     lua_newtable(L);
     luaL_register(L,NULL, msgpack_f );
+
+
+    
     return 1;
 }

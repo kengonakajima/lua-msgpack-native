@@ -5,29 +5,25 @@ local string = require("string")
 local table = require("table")
 local math = require("math")
 
-local pretty
-local res,err = pcall( function()
-                          pretty = require "pl.pretty"
-                          require "pl.strict"
-                       end)
+math.randomseed(1)
 
-local display = function(m,x)
-                   local _t = type(x)
-                   io.stdout:write(string.format("\n%s: %s ",m,_t))
-                   if _t == "table" and pretty then pretty.dump(x) else print(x) end
-                end
+function display(m,x)
+  local _t = type(x)
+  io.stdout:write(string.format("\n%s: %s ",m,_t))
+  if _t == "table" then print(x) end
+end
 
-local printf = function(p,...)
-                  io.stdout:write(string.format(p,...)); io.stdout:flush()
-               end
+function printf(p,...)
+  io.stdout:write(string.format(p,...)); io.stdout:flush()
+end
 
-local simpledump = function(s)
-                      local out=""
-                      for i=1,string.len(s) do
-                         out = out .. " " .. string.format( "%x", string.byte(s,i) )
-                      end
-                      print(out)
-                   end
+function simpledump(s)
+  local out=""
+  for i=1,string.len(s) do
+    out = out .. " " .. string.format( "%x", string.byte(s,i) )
+  end
+  print(out)
+end
 
 -- copy(right) from penlight tablex module! for test in MOAI environment. 
 function deepcompare(t1,t2,ignore_mt,eps)
@@ -62,8 +58,7 @@ local msgpack_cases = {
 }
 
 
-   
-
+-- quick test   
 local origt = {{"multi","level",{"lists","used",45,{{"trees"}}},"work",{}},"too"}
 local sss = mp.pack(origt)
 local l,t = mp.unpack(sss)
@@ -79,6 +74,95 @@ assert(t[1][5][1]==nil)
 assert(t[2]=="too")
 
 
+-- streaming API test 
+unp = mp.createUnpacker(1024*1024)
+
+function streamtest(unp,t)
+  local s = mp.pack(t)
+  print("streamtest:  len:", #s )
+  simpledump(s)
+  local startat = 1
+  while true do
+    local unit = 1+math.floor( math.random(0, #s/10 ) )
+--    if unit > #s - 
+    local subs = string.sub( s, startat, startat+unit-1 )
+--    print("OOOOOO:",startat,unit, #subs)
+    if subs and #subs > 0 then
+      unp:feed( subs )
+      startat = startat + unit
+    else
+      break
+    end
+  end
+  local out = unp:pull()
+  assert(out, "no result")
+  local res = deepcompare(out,t)
+  assert(res,"table differ")
+  out = unp:pull()
+  assert(not out,"have to be nil")
+end
+
+-- streaming: types
+streamtest( unp, { 1000 })
+streamtest( unp, { 10000 })
+
+streamtest( unp, { 1,10,100 })
+
+--,10000,1000000,1000000000,-1,-10,-100,-1000,-10000,-1000000,-10000000000 }
+    
+
+-- streaming: multiple tables
+t1 = {10,20,30}
+s1 = mp.pack(t1)
+t2 = {"aaa","bbb","ccc"}
+s2 = mp.pack(t2)
+t3 = {a=1,b=2,c=3}
+s3 = mp.pack(t3)
+sss = s1 .. s2 .. s3
+assert( #sss == (#s1 + #s2 + #s3 ) )
+unp:feed(s1)
+unp:feed(s2)
+out1 = unp:pull()
+assert(out1)
+assert( deepcompare(t1,out1))
+out2 = unp:pull()
+assert(out2)
+assert( deepcompare(t2,out2))
+out3 = unp:pull()
+assert( not out3 )
+unp:feed(s3)
+out3 = unp:pull()
+assert( deepcompare(t3,out3))
+out4 = unp:pull()
+assert( not out4 )
+
+
+--streaming: basic test
+t = { aho=7, hoge = { 5,6,"7", {8,9,10} }, fuga="11" }
+sss = mp.pack(t)
+simpledump(sss)
+assert(unp)
+unp:feed( string.char( 0x83, 0xa3, 0x61, 0x68 ) )
+unp:feed( string.char( 0x6f, 0x7, 0xa4, 0x66 ) )
+unp:feed( string.char( 0x75, 0x67, 0x61, 0xa2 ) )
+unp:feed( string.char( 0x31, 0x31, 0xa4, 0x68 ) )
+unp:feed( string.char( 0x6f, 0x67, 0x65, 0x94 ) )
+unp:feed( string.char( 0x5, 0x6, 0xa1, 0x37 ) )
+unp:feed( string.char( 0x93, 0x8, 0x9, 0xa ) )
+out = unp:pull() 
+assert( out )
+assert( deepcompare(t,out) )
+assert( not unp:pull() )
+
+
+
+
+-- stream: find corrupt data
+    
+---------
+
+
+
 sss = mp.pack({1,2,3})
 l,t = mp.unpack(sss)
 assert(t[1]==1)
@@ -92,6 +176,7 @@ assert(t.a==1)
 assert(t.b==2)
 assert(t.c==3)
 assert(t.d==nil)
+simpledump(sss)
 
 
 
@@ -213,23 +298,23 @@ print("OK")
 
 print("Raw tests ")
 
-local rand_raw = function(len)
-                    local t = {}
-                    for i=1,len do t[i] = string.char(math.random(0,255)) end
-                    return table.concat(t)
-                 end
+function rand_raw(len)
+  local t = {}
+  for i=1,len do t[i] = string.char(math.random(0,255)) end
+  return table.concat(t)
+end
 
-local raw_test = function(raw,overhead)
-                    offset,res = mp.unpack(mp.pack(raw))
-                    assert(offset,"decoding failed")
-                    if not res == raw then
-                       assert(false,string.format("wrong raw (len %d - %d)",#res,#raw))
-                    end
-                    assert(offset-#raw == overhead,string.format(
-                              "wrong overhead %d for #raw %d (expected %d)",
-                              offset-#raw,#raw,overhead
-                        ))
-                 end
+function raw_test(raw,overhead)
+  offset,res = mp.unpack(mp.pack(raw))
+  assert(offset,"decoding failed")
+  if not res == raw then
+    assert(false,string.format("wrong raw (len %d - %d)",#res,#raw))
+  end
+  assert(offset-#raw == overhead,string.format(
+        "wrong overhead %d for #raw %d (expected %d)",
+        offset-#raw,#raw,overhead
+    ))
+end
 
 printf(".")
 for n=0,31 do -- fixraw
@@ -263,17 +348,17 @@ print("OK")
 
 printf("Integer tests ")
 
-local nb_test = function(n,sz)
-                   offset,res = mp.unpack(mp.pack(n))
-                   assert(offset,"decoding failed")
-                   if not res == n then
-                      assert(false,string.format("wrong value %d, expected %d",res,n))
-                   end
-                   assert(offset == sz,string.format(
-                             "wrong size %d for number %d (expected %d)",
-                             offset,n,sz
-                       ))
-                end
+function nb_test(n,sz)
+  offset,res = mp.unpack(mp.pack(n))
+  assert(offset,"decoding failed")
+  if not res == n then
+    assert(false,string.format("wrong value %d, expected %d",res,n))
+  end
+  assert(offset == sz,string.format(
+        "wrong size %d for number %d (expected %d)",
+        offset,n,sz
+    ))
+end
 
 printf(".")
 for n=0,127 do -- positive fixnum
