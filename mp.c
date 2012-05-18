@@ -604,10 +604,18 @@ static int msgpack_unpack_api( lua_State *L ) {
 }        
 
 typedef enum {
-    // containers
-    MPCT_ARRAY,
-    MPCT_MAP,
-    // direct values
+    // containers without size bytes
+    MPCT_FIXARRAY,
+    MPCT_FIXMAP,
+    // containers with size bytes
+    MPCT_ARRAY16,
+    MPCT_MAP16,
+    MPCT_MAP32,
+    MPCT_ARRAY32,
+    // direct values with size bytes
+    MPCT_RAW16,
+    MPCT_RAW32,    
+    // direct values without size bytes
     MPCT_RAW,
     MPCT_FLOAT,
     MPCT_DOUBLE,
@@ -618,12 +626,14 @@ typedef enum {
     MPCT_INT8,
     MPCT_INT16,
     MPCT_INT32,
-    MPCT_INT64,    
+    MPCT_INT64,
+
+
     
 } MP_CONTAINER_TYPE;
 
 int MP_CONTAINER_TYPE_is_container( MP_CONTAINER_TYPE t ) {
-    if(t==MPCT_ARRAY || t==MPCT_MAP ){
+    if(t==MPCT_FIXARRAY || t==MPCT_FIXMAP ){
         return 1;
     } else {
         return 0;
@@ -631,8 +641,8 @@ int MP_CONTAINER_TYPE_is_container( MP_CONTAINER_TYPE t ) {
 }
 char *MP_CONTAINER_TYPE_to_s( MP_CONTAINER_TYPE t ) {
     switch(t){
-    case MPCT_ARRAY: return "ary";
-    case MPCT_MAP: return "map";
+    case MPCT_FIXARRAY: return "fixary";
+    case MPCT_FIXMAP: return "fixmap";
     case MPCT_RAW: return "raw";
     case MPCT_FLOAT: return "float";
     case MPCT_DOUBLE: return "double";
@@ -648,11 +658,23 @@ char *MP_CONTAINER_TYPE_to_s( MP_CONTAINER_TYPE t ) {
         assert( !"not impl");
     }
 }
+int MP_CONTAINER_TYPE_sizesize( MP_CONTAINER_TYPE t) {
+    if( t == MPCT_ARRAY16 || t == MPCT_MAP16 || t == MPCT_RAW16 ){
+        return 2;
+    } else if( t == MPCT_ARRAY32 || t == MPCT_MAP32 || t == MPCT_RAW32 ){
+        return 4;
+    } else {
+        return 0;
+    }
+}
 
 typedef struct {
     MP_CONTAINER_TYPE t;
     size_t expect;
     size_t sofar;
+
+    size_t sizesize; // array16,map16,raw16:2 array32,map32,raw32:4
+    size_t sizesofar;
 } mpstackent_t;
 
 typedef struct {
@@ -678,6 +700,8 @@ void mpstackent_init( mpstackent_t *e, MP_CONTAINER_TYPE t, size_t expect ) {
     e->t = t;
     e->expect = expect;
     e->sofar = 0;
+    e->sizesize = MP_CONTAINER_TYPE_sizesize(t);
+    e->sizesofar = 0;
 }
 
 
@@ -772,10 +796,10 @@ int unpacker_feed( unpacker_t *u, char *p, size_t len ) {
             unpacker_progress(u);
         } else if( ch>=0x80 && ch<=0x8f ){ // fixmap
             int n = ch & 0xf;
-            if(unpacker_push( u, MPCT_MAP, n*2 )<0) return -1;
+            if(unpacker_push( u, MPCT_FIXMAP, n*2 )<0) return -1;
         } else if( ch>=0x90 && ch<=0x9f ){ // fixarray
             int n = ch & 0xf;
-            if(unpacker_push( u, MPCT_ARRAY, n )<0) return -1;
+            if(unpacker_push( u, MPCT_FIXARRAY, n )<0) return -1;
         } else if( ch>=0xa0 && ch<=0xbf ){ // fixraw
             int n = ch & 0x1f;
             if(unpacker_push( u, MPCT_RAW, n )<0) return -1;
