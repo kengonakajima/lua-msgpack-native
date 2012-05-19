@@ -80,13 +80,15 @@ Streaming API
 ====
 It also has streaming parser: feed() bytes, and pull() tables.
 
-    local tbl = { aho=7, hoge = { 5,6,"7", {8,9,10} }, fuga="11" }
+    local tbl = { piyo=7, hoge = { 5,6,"7", {8,9,10} }, fuga="11" }
     local str = mp.pack(tbl)
     local u = mp.createUnpacker(1024)
     u:feed( string.sub(s,1,11))  -- feed first half of the data
     u:feed( string.sub(s,12,#s))  -- and feed latter half of the data
     local outtbl = u:pull()  -- pull() success
+    print( outtbl.piyo ) -- => "7"
     local outnil = u:pull()  -- pull() returns nil, no data.
+    
 
 Streaming API is 10~30% slower than normal unpack() function:
     
