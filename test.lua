@@ -280,7 +280,31 @@ assert(t.d==nil)
 simpledump(sss)
 
 
+-- number edge test
 
+function isnan(n)
+  return n ~= n
+end
+print("nan")
+packed = mp.pack( 0/0 )
+assert( packed == string.char( 0xcb, 0xff, 0xf8, 0,0,0,0,0,0 ) )
+l,unpacked = mp.unpack(packed)
+assert( isnan( unpacked ) )
+
+print("+inf")
+packed = mp.pack(1/0)
+assert( packed == string.char( 0xcb, 0x7f, 0xf0, 0,0,0,0,0,0 ) )
+l,unpacked = mp.unpack(packed)
+assert( unpacked == 1/0 )
+
+print("-inf")
+packed = mp.pack(-1/0)
+assert( packed == string.char( 0xcb, 0xff, 0xf0, 0,0,0,0,0,0 ) )
+l,unpacked = mp.unpack(packed)
+assert( unpacked == -1/0)
+
+
+-- misc data
 local data = {
    nil,
    true,
@@ -312,11 +336,10 @@ local data = {
    {a=1,b=2,c=3,d=4,e=5,f=6,g=7,h=8,i=9,j=10,k=11,l=12,m=13,n=14,o=15,p=16,q=17,r=18},
    {true,false,42,-42,0.79,"Hello","World!"}, -- 28
    {{"multi","level",{"lists","used",45,{{"trees"}}},"work",{}},"too"},
-   {foo="bar",spam="eggs"},
+   {foo="bar",spam="eggs"}, -- 30
    {nested={maps={"work","too"}}},
-   {"we","can",{"mix","integer"},{keys="and"},{2,{maps="as well"}}},
+   {"we","can",{"mix","integer"},{keys="and"},{2,{maps="as well"}}}, -- 32
    msgpack_cases,
-
 }
 
 local offset,res
@@ -328,8 +351,9 @@ for i=1,#data do -- 0 tests nil!
    offset,res = mp.unpack(mp.pack(data[i]))
    assert(offset,"decoding failed")
    if not deepcompare(res,data[i]) then
-      display("expected",data[i])
-      display("found",res)
+      display("expected type:",data[i])
+      display("found type:",res)
+      print( "found value:", res)
       assert(false,string.format("wrong value in case %d",i))
     end
 end

@@ -100,7 +100,25 @@ static size_t mpwbuf_pack_boolean( mpwbuf_t *b, int i) {
 static size_t mpwbuf_pack_number( mpwbuf_t *b, lua_Number n ) {
     unsigned char buf[1+8];
     size_t len=0;
-    if(floor(n)==n){
+
+    if( isinf(n) ){
+        buf[0] = 0xcb; // double
+        if(n>0){
+            buf[1] = 0x7f;
+            buf[2] = 0xf0;
+        } else {
+            buf[1] = 0xff;
+            buf[2] = 0xf0;
+        }
+        buf[3] = buf[4] = buf[5] = buf[6] = buf[7] = buf[8] = 0;
+        len += 1+8;
+    } else if( isnan(n) ) {
+        buf[0] = 0xcb;
+        buf[1] = 0xff;
+        buf[2] = 0xf8;
+        buf[3] = buf[4] = buf[5] = buf[6] = buf[7] = buf[8] = 0;
+        len += 1+8;        
+    } else if(floor(n)==n){
         long long lv = (long long)n;
         if(lv>=0){
             if(lv<128){
