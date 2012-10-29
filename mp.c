@@ -1,8 +1,5 @@
-#include <stdio.h>
 #include <math.h>
-#include <strings.h>
 #include <string.h>
-#include <stdlib.h>
 #include <assert.h>
 
 #include <arpa/inet.h>
@@ -724,10 +721,12 @@ typedef struct {
     size_t resultnum;
 } unpacker_t;
 
-void unpacker_init( unpacker_t *u, size_t maxsize ) {
+void unpacker_init( lua_State *L, unpacker_t *u, size_t maxsize ) {
+    void* ud;
+    lua_Alloc alloc = lua_getallocf( L, &ud );
     u->nstacked = 0;
     u->resultnum = 0;
-    u->buf = (char*) malloc( maxsize );
+    u->buf = alloc( ud, NULL, 0, maxsize );
     assert(u->buf);
     u->used = 0;
     u->size = maxsize;
@@ -988,8 +987,10 @@ static int msgpack_unpacker_pull_api( lua_State *L ) {
     return 1;
 }
 static int msgpack_unpacker_gc_api( lua_State *L ) {
+    void* ud;
+    lua_Alloc alloc = lua_getallocf( L, &ud );
     unpacker_t *u =  luaL_checkudata( L, 1, "msgpack_unpacker" );
-    free(u->buf);
+    (void)alloc( ud, u->buf, 0, 0 );    // freeing
     u->buf = NULL;
     return 0;
 }
@@ -1015,7 +1016,7 @@ static int msgpack_createUnpacker_api( lua_State *L ) {
 #endif    
     unpacker_t *u = (unpacker_t*) lua_newuserdata( L, sizeof(unpacker_t));
 
-    unpacker_init( u, bufsz );
+    unpacker_init(L, u, bufsz );
     luaL_getmetatable(L, "msgpack_unpacker" );
     lua_setmetatable(L, -2 );
     return 1;
