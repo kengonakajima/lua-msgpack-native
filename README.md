@@ -105,7 +105,15 @@ Streaming API is 10~30% slower than normal unpack() function:
     mp:	str1000	2.246217	sec	native:	1335578.8866347	stream:	1072244.242942
     mp:	str10000	1.777126	sec	native:	168811.89065941	stream:	155099.03590439
 
-    
+
+Install with Luarocks
+====
+You can use luarocks to build and install on your environment by:
+
+    sudo luarocks make rockspec/lua-msgpack-native-scm-1.rockspec
+
+Note: This method is tested only on Linux and OSX.
+
 Related works
 ====
 In many cases ,Lua runtime doesn't allow adding native modules.
